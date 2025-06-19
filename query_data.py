@@ -202,21 +202,26 @@ def query_rag(query_text: str):
     cited_sources_brackets = re.findall(r'\[Source (\d+)\]', response_text)
     cited_sources_parens = re.findall(r'\(Source (\d+)\)', response_text)
     
-    # Combine both formats and get unique source numbers
+    # Combine both formats and get all cited source numbers (preserving order)
     all_cited = cited_sources_brackets + cited_sources_parens
     cited_source_nums = [int(num) for num in all_cited]
     
     # Filter to only valid citations (within our chunk range 1 to k_chunks)
     valid_citation_nums = [num for num in cited_source_nums if 1 <= num <= k_chunks]
     
-    # Get unique valid citations and sort them
-    unique_valid_citations = sorted(set(valid_citation_nums))
+    # Get unique valid citations in ORDER OF FIRST APPEARANCE (not numerical order)
+    unique_valid_citations = []
+    seen = set()
+    for num in valid_citation_nums:
+        if num not in seen:
+            unique_valid_citations.append(num)
+            seen.add(num)
     
-    # Filter citations to only include valid ones
-    used_citations = [citation for citation in all_citations if citation["source_num"] in unique_valid_citations]
-    
-    # Sort by source number to ensure ascending order
-    used_citations.sort(key=lambda x: x["source_num"])
+    # Filter citations to only include valid ones and sort by ORDER OF FIRST APPEARANCE
+    used_citations = []
+    for source_num in unique_valid_citations:  # This preserves appearance order
+        citation = next(c for c in all_citations if c["source_num"] == source_num)
+        used_citations.append(citation)
 
     # FRONTEND RENUMBERING: Create mapping from original numbers to sequential 1, 2, 3...
     if used_citations:
@@ -226,23 +231,38 @@ def query_rag(query_text: str):
             original_num = citation["source_num"]
             renumber_map[original_num] = new_num
         
-        # Replace citation numbers in response text
+        # Replace citation numbers in response text using temporary placeholders to avoid conflicts
         renumbered_response = response_text
         
-        # Replace [Source X] format - only for valid citations
+        # Step 1: Replace with temporary placeholders first
         for original_num, new_num in renumber_map.items():
+            # Use unique temporary placeholders that won't conflict
+            temp_placeholder_brackets = f"__TEMP_SOURCE_{original_num}_BRACKETS__"
+            temp_placeholder_parens = f"__TEMP_SOURCE_{original_num}_PARENS__"
+            
             renumbered_response = re.sub(
                 f'\[Source {original_num}\]',
-                f'[Source {new_num}]',
+                temp_placeholder_brackets,
+                renumbered_response
+            )
+            renumbered_response = re.sub(
+                f'\(Source {original_num}\)',
+                temp_placeholder_parens,
                 renumbered_response
             )
         
-        # Replace (Source X) format - only for valid citations
+        # Step 2: Replace temporary placeholders with final numbers
         for original_num, new_num in renumber_map.items():
-            renumbered_response = re.sub(
-                f'\(Source {original_num}\)',
-                f'(Source {new_num})',
-                renumbered_response
+            temp_placeholder_brackets = f"__TEMP_SOURCE_{original_num}_BRACKETS__"
+            temp_placeholder_parens = f"__TEMP_SOURCE_{original_num}_PARENS__"
+            
+            renumbered_response = renumbered_response.replace(
+                temp_placeholder_brackets,
+                f'[Source {new_num}]'
+            )
+            renumbered_response = renumbered_response.replace(
+                temp_placeholder_parens,
+                f'(Source {new_num})'
             )
         
         # Remove any invalid citations from the response text (outside our range)
