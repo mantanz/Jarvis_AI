@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Citation Tooltips Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .citation-tooltip {
+            background-color: #e6f3ff;
+            border: 1px solid #0066cc;
+            border-radius: 3px;
+            padding: 2px 4px;
+            cursor: pointer;
+            position: relative;
+            text-decoration: none;
+            color: #0066cc;
+            font-weight: bold;
+        }
+
+        .citation-tooltip:hover {
+            background-color: #cce6ff;
+        }
+
+        /* Tooltip container */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        /* Tooltip text */
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-line;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Tooltip arrow */
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+
+        /* Show tooltip on hover */
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .response-text {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #0066cc;
+        }
+
+        .demo-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+
+        .usage-instructions {
+            background-color: #ffffcc;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>RAG Citation Tooltips Demo</h1>
+    
+    <div class="usage-instructions">
+        <h3>Usage Instructions:</h3>
+        <p>To use this tooltip functionality with your Python script:</p>
+        <ol>
+            <li>Run your query: <code>python query_data.py "your question" --html</code></li>
+            <li>Copy the HTML output and paste it into the response section below</li>
+            <li>Hover over the citation links to see source details</li>
+        </ol>
+    </div>
+
+    <div class="demo-section">
+        <h2>Example Response with Tooltips</h2>
+        <div class="response-text">
+            <p>Machine learning algorithms are used to analyze large datasets and identify patterns 
+            <span class="tooltip citation-tooltip">
+                [Source 1]
+                <span class="tooltiptext">Source 1: machine_learning_basics.pdf
+Page: 42
+Relevance: 0.87
+Path: /documents/ml/machine_learning_basics.pdf
+Preview: Machine learning algorithms are computational methods that allow systems to automatically learn and improve from experience without being explicitly programmed...</span>
+            </span>. 
+            These algorithms can be categorized into supervised, unsupervised, and reinforcement learning types 
+            <span class="tooltip citation-tooltip">
+                [Source 2]
+                <span class="tooltiptext">Source 2: ai_fundamentals.pdf
+Page: 15
+Relevance: 0.82  
+Path: /documents/ai/ai_fundamentals.pdf
+Preview: The three main categories of machine learning are supervised learning, where algorithms learn from labeled training data...</span>
+            </span>.</p>
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2>How to Integrate</h2>
+        <p>Your Python script now returns the following data structure:</p>
+        <pre><code>{
+    "response_text": "Plain text response",
+    "citations": [...],  // Citation details with tooltip_text
+    "html_response_with_tooltips": "HTML with tooltip spans",
+    "formatted_response": "Text with citation list",
+    ...
+}</code></pre>
+        
+        <p>Use the <code>html_response_with_tooltips</code> field in your web application and include the CSS above for styling.</p>
+    </div>
+
+    <script>
+        // Optional: Add click-to-copy functionality for citations
+        document.querySelectorAll('.citation-tooltip').forEach(function(citation) {
+            citation.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tooltipText = this.querySelector('.tooltiptext')?.textContent || this.getAttribute('data-tooltip');
+                if (tooltipText) {
+                    navigator.clipboard.writeText(tooltipText).then(function() {
+                        console.log('Citation details copied to clipboard');
+                    });
+                }
+            });
+        });
+
+        // Optional: Enhanced tooltip positioning for edge cases
+        document.querySelectorAll('.tooltip').forEach(function(tooltip) {
+            const tooltiptext = tooltip.querySelector('.tooltiptext');
+            if (tooltiptext) {
+                tooltip.addEventListener('mouseenter', function() {
+                    const rect = tooltiptext.getBoundingClientRect();
+                    const viewportWidth = window.innerWidth;
+                    
+                    // Adjust tooltip position if it goes off-screen
+                    if (rect.right > viewportWidth) {
+                        tooltiptext.style.left = 'auto';
+                        tooltiptext.style.right = '0';
+                        tooltiptext.style.marginLeft = '0';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html> 
