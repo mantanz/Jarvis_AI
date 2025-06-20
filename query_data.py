@@ -1,60 +1,3 @@
-# import argparse
-# from langchain.vectorstores.chroma import Chroma
-# from langchain.prompts import ChatPromptTemplate
-# from langchain_community.llms.ollama import Ollama
-
-# from get_embedding_function import get_embedding_function
-
-# CHROMA_PATH = "chroma"
-
-# PROMPT_TEMPLATE = """
-# Answer the question based only on the following context:
-
-# {context}
-
-# ---
-
-# Answer the question based on the above context: {question}
-
-# """
-
-
-# def main():
-#     # Create CLI.
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("query_text", type=str, help="The query text.")
-#     args = parser.parse_args()
-#     query_text = args.query_text
-#     query_rag(query_text)
-
-
-
-
-# def query_rag(query_text: str):
-#     # Prepare the DB.
-#     embedding_function = get_embedding_function()
-#     db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
-
-#     # Search the DB.
-#     results = db.similarity_search_with_score(query_text, k=5)
-
-#     context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
-#     prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
-#     prompt = prompt_template.format(context=context_text, question=query_text)
-#     # print(prompt)
-
-#     model = Ollama(model="llama3.2:latest")
-#     response_text = model.invoke(prompt)
-
-#     sources = [doc.metadata.get("id", None) for doc, _score in results]
-#     formatted_response = f"Response: {response_text}\nSources: {sources}"
-#     print(formatted_response)
-#     return response_text
-
-
-# if __name__ == "__main__":
-#     main()
-
 
 import argparse
 from langchain.vectorstores.chroma import Chroma
@@ -105,7 +48,7 @@ You must strictly follow these citation rules:
 2. Do not refer to source numbers in the body of the sentence. For example, write "The lion is the king of the jungle[Source 1]," not "Source 1 states that the lion is the king of the jungle."
 3. Do not say "according to Source X" or "Source X says." The citation should come only at the end of the sentence or clause, not embedded in the sentence.
 4. If a sentence includes multiple facts from different sources, include all relevant citations like [Source 1], [Source 3].
-5. If no source supports the claim, say "The answer cannot be determined from the given sources."
+5. If no source supports the claim, say "The answer cannot be determined from the given sources." Never mention the sources or that sources were provided if the answer cannot be determined from the given sources.
 
 --- 
 
