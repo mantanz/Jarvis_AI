@@ -73,20 +73,35 @@ class CitationManager:
 
         # Renumber the response text using a safe, two-step replacement
         renumbered_text = response_text
-        # Step 1: Replace with temporary, unique placeholders
+        
+        # Step 1: Replace valid citations with temporary, unique placeholders
         for original_num, new_num in renumber_map.items():
             renumbered_text = re.sub(
                 f'\[Source {original_num}\]', 
                 f"__TEMP_SOURCE_{new_num}__", 
                 renumbered_text
             )
-        # Step 2: Replace placeholders with final, renumbered citation format
+        
+        # Step 2: Remove any remaining invalid citations (outside our valid range)
+        # This handles cases where LLM generates citations beyond k_chunks
+        for num in cited_original_nums:
+            if num < 1 or num > self.k_chunks:
+                renumbered_text = re.sub(f'\[Source {num}\]', '', renumbered_text)
+        
+        # Step 2.5: Remove original citations from source documents (like [23], [12], etc.)
+        # These are citations that existed in the original documents, not our RAG citations
+        renumbered_text = re.sub(r'\[(\d+)\]', '', renumbered_text)
+        
+        # Step 3: Replace placeholders with final, renumbered citation format
         for original_num, new_num in renumber_map.items():
             renumbered_text = re.sub(
                 f"__TEMP_SOURCE_{new_num}__",
                 f"[Source {new_num}]",
                 renumbered_text
             )
+        
+        # Step 4: Clean up any extra whitespace left by removed citations
+        renumbered_text = re.sub(r'\s+', ' ', renumbered_text).strip()
         
         # Create the final list of renumbered citation objects
         final_citations = []

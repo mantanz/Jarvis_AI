@@ -136,15 +136,17 @@ def format_response_with_streamlit_tooltips(response_text: str, citations: list)
     
     # Replace citations with tooltip-enabled spans
     for source_num, tooltip_text in citation_tooltips.items():
-        # Truncate tooltip text if too long to prevent display issues
-        truncated_tooltip = tooltip_text[:500] + "..." if len(tooltip_text) > 500 else tooltip_text
+        # Show full chunk content without truncation
+        # Preserve paragraph breaks but format for tooltip display
+        formatted_tooltip = (tooltip_text
+                           .replace('\n\n', ' • ')  # Paragraph breaks become bullet points
+                           .replace('\n', ' ')       # Single line breaks become spaces
+                           .replace('\r', ' '))
         
-        # Escape quotes and newlines in tooltip text for HTML attributes
-        escaped_tooltip = (truncated_tooltip
+        # Escape quotes for HTML attributes
+        escaped_tooltip = (formatted_tooltip
                           .replace('"', '&quot;')
-                          .replace("'", "&#39;")
-                          .replace('\n', ' ')
-                          .replace('\r', ' '))
+                          .replace("'", "&#39;"))
         
         # Create tooltip HTML with proper structure for Streamlit
         tooltip_html = f'''<span class="tooltip citation-tooltip">[Source {source_num}]<span class="tooltiptext">{escaped_tooltip}</span></span>'''

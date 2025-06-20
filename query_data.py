@@ -279,11 +279,13 @@ When making claims or statements, include inline citations using the format [Sou
 
 You must strictly follow these citation rules:
 
-1. All factual claims must include an inline citation in the format [Source X].
-2. Do not refer to source numbers in the body of the sentence. For example, write "The lion is the king of the jungle[Source 1]," not "Source 1 states that the lion is the king of the jungle."
-3. Do not say "according to Source X" or "Source X says." The citation should come only at the end of the sentence or clause, not embedded in the sentence.
-4. If a sentence includes multiple facts from different sources, include all relevant citations like [Source 1], [Source 3].
-5. If no source supports the claim, say "The answer cannot be determined from the given sources." Never mention the sources or that sources were provided if the answer cannot be determined from the given sources.
+1. CRITICAL: Every single factual claim, definition, or piece of information must include an inline citation in the format [Source X]. 
+2. IMPORTANT: The response should indicate exactly the source the fact was taken from.
+3. If you use information from multiple sources in one sentence, you MUST cite ALL relevant sources like [Source 1][Source 3].4. Do not combine information from different sources without citing each source separately.
+4. VERY IMPORTANT: Do not refer to source numbers in the body of the sentence. For example, write "The lion is the king of the jungle[Source 1]," not "Source 1 states that the lion is the king of the jungle."
+5. Do not say "according to Source X" or "Source X says." The citation should come only at the end of the sentence or clause, not embedded in the sentence.
+6. If no source/context that has been provided supports the claim, say "The answer cannot be determined from the given sources." Never mention the sources or that sources were provided if the answer cannot be determined from the given sources.
+7. Be extremely careful not to make any statement without proper citation - even if it seems obvious or general knowledge, if it appears in the context, it must be cited.
 
 --- 
 
