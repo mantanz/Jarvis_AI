@@ -122,8 +122,11 @@ def calculate_chunk_ids(chunks):
         page = chunk.metadata.get("page")
         paragraph_num = chunk.metadata.get("paragraph_num", 1)
         
+        # Convert page to 1-based indexing (PyPDF uses 0-based)
+        page_number = page + 1 if isinstance(page, int) else page
+        
         # Create paragraph-level ID
-        current_para_id = f"{source}:{page}:{paragraph_num}"
+        current_para_id = f"{source}:{page_number}:{paragraph_num}"
 
         # If the paragraph ID is the same as the last one, increment the chunk index
         if current_para_id == last_para_id:
@@ -138,6 +141,7 @@ def calculate_chunk_ids(chunks):
         # Add it to the chunk metadata
         chunk.metadata["id"] = chunk_id
         chunk.metadata["paragraph_id"] = current_para_id
+        chunk.metadata["page"] = page_number  # Store the corrected 1-based page number
 
     return chunks
 

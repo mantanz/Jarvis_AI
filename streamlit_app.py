@@ -1,13 +1,17 @@
 import streamlit as st
 from processing import load_documents, split_documents, add_to_chroma, clear_database
 from query_data import query_rag
+from chunk_pdf_viewer import ChunkPDFViewer
 
 st.set_page_config(page_title="RAG Pipeline App", page_icon="📚")
 
-# Custom CSS for tooltips
+# Initialize chunk PDF viewer
+chunk_viewer = ChunkPDFViewer()
+
+# Custom CSS for citations with chunk navigation
 st.markdown("""
 <style>
-    .citation-tooltip {
+    .citation-clickable {
         background-color: #e6f3ff;
         border: 1px solid #0066cc;
         border-radius: 3px;
@@ -19,10 +23,13 @@ st.markdown("""
         font-weight: bold;
         display: inline-block;
         margin: 0 2px;
+        transition: all 0.2s ease;
     }
 
-    .citation-tooltip:hover {
+    .citation-clickable:hover {
         background-color: #cce6ff;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,102,204,0.2);
     }
 
     /* Tooltip container */
@@ -104,41 +111,83 @@ st.markdown("""
         overflow: visible !important;
     }
 
-    /* Enhanced visibility */
-    .citation-tooltip {
-        transition: all 0.2s ease;
+    /* Document viewer section */
+    .document-viewer-section {
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        margin: 10px 0;
+        background: #f8f9fa;
     }
 
-    .citation-tooltip:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0,102,204,0.2);
+    .document-viewer-header {
+        background: #2196f3;
+        color: white;
+        padding: 10px 15px;
+        margin: 0;
+        border-radius: 6px 6px 0 0;
+        font-weight: bold;
     }
 </style>
+
+<script>
+// Global variable to track currently displayed document viewer
+let currentDocumentViewer = null;
+
+// Function to navigate to chunk in PDF viewer
+function navigateToChunk(sourceNum) {
+    // Find the iframe containing the PDF viewer
+    const pdfViewerIframes = document.querySelectorAll('iframe[title*="stIFrame"]');
+    
+    pdfViewerIframes.forEach(iframe => {
+        try {
+            // Send message to PDF viewer to navigate to chunk
+            iframe.contentWindow.postMessage({
+                type: 'navigateToChunk',
+                chunkId: 'chunk-' + sourceNum
+            }, '*');
+        } catch (e) {
+            // Cross-origin restrictions, but message should still get through
+        }
+    });
+}
+
+// Add event listener for citation clicks
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('citation-clickable')) {
+        const sourceNum = event.target.getAttribute('data-source-num');
+        if (sourceNum) {
+            navigateToChunk(sourceNum);
+        }
+    }
+});
+</script>
 """, unsafe_allow_html=True)
 
 st.title("RAG Pipeline")
 
-# Add info about tooltips
-st.info("💡 **Tip:** Hover over citation links [Source X] in responses to see detailed source information!")
+# Add info about the new chunk navigation feature
+st.info("✨ **New Feature:** Click on citations (e.g., [Source 1]) in responses to navigate directly to the specific chunk in the document viewer below!")
 
-def format_response_with_streamlit_tooltips(response_text: str, citations: list) -> str:
+st.markdown("---")
+
+
+def format_response_with_chunk_navigation(response_text: str, citations: list) -> str:
     """
-    Format response text with Streamlit-compatible tooltip HTML.
+    Format response text with clickable citations that navigate to chunks in the PDF viewer.
     """
     import re
     
     formatted_response = response_text
     
-    # Create a mapping of citation numbers to tooltip data
-    citation_tooltips = {}
+    # Create a mapping of citation numbers to citation data
+    citation_data = {}
     for citation in citations:
-        citation_tooltips[citation["source_num"]] = citation["tooltip_text"]
+        citation_data[citation["source_num"]] = citation
     
-    # Replace citations with tooltip-enabled spans
-    for source_num, tooltip_text in citation_tooltips.items():
-        # Show full chunk content without truncation
-        # Preserve paragraph breaks but format for tooltip display
-        formatted_tooltip = (tooltip_text
+    # Replace citations with clickable, tooltip-enabled spans
+    for source_num, citation in citation_data.items():
+        # Format tooltip text
+        formatted_tooltip = (citation["tooltip_text"]
                            .replace('\n\n', ' • ')  # Paragraph breaks become bullet points
                            .replace('\n', ' ')       # Single line breaks become spaces
                            .replace('\r', ' '))
@@ -148,13 +197,13 @@ def format_response_with_streamlit_tooltips(response_text: str, citations: list)
                           .replace('"', '&quot;')
                           .replace("'", "&#39;"))
         
-        # Create tooltip HTML with proper structure for Streamlit
-        tooltip_html = f'''<span class="tooltip citation-tooltip">[Source {source_num}]<span class="tooltiptext">{escaped_tooltip}</span></span>'''
+        # Create clickable citation with chunk navigation
+        citation_html = f'''<span class="tooltip citation-clickable" data-source-num="{source_num}" onclick="navigateToChunk({source_num})" style="cursor: pointer;">[Source {source_num}]<span class="tooltiptext">{escaped_tooltip}</span></span>'''
         
-        # Replace [Source X] with tooltip-enabled span
+        # Replace [Source X] with clickable citation
         formatted_response = re.sub(
             f'\\[Source {source_num}\\]',
-            tooltip_html,
+            citation_html,
             formatted_response
         )
     
@@ -187,6 +236,8 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
     
+
+    
     # Download chat history
     # if st.session_state.messages and st.button("📚 Download Chat"):
     #     history_content = "# Chat History\n\n"
@@ -209,33 +260,171 @@ with st.sidebar:
     #         mime="text/markdown"
     #     )
 
+# Document opening handler with highlighting
+st.components.v1.html("""
+<script>
+function openDocument(filename, filepath, page, highlightText, fullText) {
+    try {
+        // Store the highlight information for potential use
+        if (highlightText) {
+            console.log('Opening document with highlight:', highlightText);
+            sessionStorage.setItem('highlightText', highlightText);
+            sessionStorage.setItem('fullText', fullText);
+        }
+        
+        // Try different methods to open the document with highlighting
+        let fileUrl = 'file:///' + filepath.replace(/\\/g, '/') + '#page=' + page;
+        
+        // If we have text to highlight, try to use PDF.js search functionality
+        if (highlightText) {
+            // Try PDF.js viewer URL format with search
+            const searchText = encodeURIComponent(highlightText.substring(0, 50));
+            const pdfJsUrl = fileUrl + '&search=' + searchText;
+            
+            // Method 1: Try to open with PDF.js search
+            let newWindow = window.open(pdfJsUrl, '_blank');
+            
+            // Method 2: If that fails, try standard URL
+            if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+                newWindow = window.open(fileUrl, '_blank');
+            }
+            
+            // Method 3: If that also fails, try creating a temporary link
+            if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+                const link = document.createElement('a');
+                link.href = fileUrl;
+                link.target = '_blank';
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            
+            // Show user notification about the highlighted text
+            setTimeout(() => {
+                if (confirm('Document opened. The highlighted text is: "' + highlightText + '..." \\n\\nClick OK to copy the full text to clipboard for easy finding.')) {
+                    navigator.clipboard.writeText(fullText).then(() => {
+                        alert('Full text copied to clipboard! You can use Ctrl+F to search for it in the PDF.');
+                    }).catch(() => {
+                        prompt('Full text to search for (copy this):', fullText);
+                    });
+                }
+            }, 1000);
+            
+        } else {
+            // Standard document opening without highlighting
+            const newWindow = window.open(fileUrl, '_blank');
+            
+            if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+                const link = document.createElement('a');
+                link.href = fileUrl;
+                link.target = '_blank';
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Could not open document:', error);
+        alert('Could not open document: ' + filename + '. Please check if the file exists and your browser allows file:// URLs.');
+    }
+}
+
+// Listen for document opening events
+window.addEventListener('openDocument', function(event) {
+    const { filename, filepath, page, highlightText, fullText } = event.detail;
+    openDocument(filename, filepath, page, highlightText, fullText);
+});
+
+// Also check for any pending documents to open
+setInterval(function() {
+    if (window.documentsToOpen && window.documentsToOpen.length > 0) {
+        const doc = window.documentsToOpen.shift();
+        openDocument(doc.filename, doc.filepath, doc.page, doc.highlightText, doc.fullText);
+    }
+}, 100);
+</script>
+""", height=0)
+
 # Main chat interface
 
 
 # Display chat messages
 chat_container = st.container()
 with chat_container:
-    for message in st.session_state.messages:
+    for msg_idx, message in enumerate(st.session_state.messages):
         if message["role"] == "user":
             with st.chat_message("user"):
                 st.write(message["content"])
         else:
             with st.chat_message("assistant"):
-                # Display response with tooltips if citations exist
+                # Display response with clickable citations for chunk navigation
                 if message.get("citations"):
-                    response_with_tooltips = format_response_with_streamlit_tooltips(
+                    response_with_navigation = format_response_with_chunk_navigation(
                         message["content"], 
                         message["citations"]
                     )
-                    st.markdown(response_with_tooltips, unsafe_allow_html=True)
+                    st.markdown(response_with_navigation, unsafe_allow_html=True)
                 else:
                     st.write(message["content"])
                 
-                # Show expandable sources section as backup
+                # Show expandable sources section with navigation
                 if message.get("citations"):
                     with st.expander(f"📚 Sources ({len(message['citations'])} cited)", expanded=False):
-                        for citation in message["citations"]:
-                            st.write(f"• **[Source {citation['source_num']}]** {citation['filename']}, p. {citation['page']}")
+                        # Try to use enhanced citations with navigation
+                        citations_to_display = message.get("enhanced_citations", message.get("citations", []))
+                        
+                        for citation in citations_to_display:
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.write(f"• **[Source {citation['source_num']}]** {citation['filename']}, p. {citation['page']}")
+                            
+                            # Add navigation buttons if available
+                            if "navigation_urls" in citation:
+                                with col2:
+                                    try:
+                                        from citation_navigation import CitationNavigation
+                                        nav_handler = CitationNavigation()
+                                        # Create unique citation for navigation with message index
+                                        unique_citation = citation.copy()
+                                        unique_citation['unique_key'] = f"msg_{msg_idx}_src_{citation['source_num']}"
+                                        nav_handler.create_navigation_buttons(unique_citation, "compact")
+                                    except ImportError:
+                                        pass
+                            else:
+                                # Enhanced navigation with View Page button
+                                with col2:
+                                    filename = citation.get('filename', '')
+                                    if filename.endswith('.pdf'):
+                                        # Create buttons for different actions
+                                        btn_col1, btn_col2 = st.columns(2)
+                                        
+                                        with btn_col1:
+                                            unique_key = f"open_msg_{msg_idx}_{citation['source_num']}"
+                                            if st.button(f"🔗", key=unique_key, 
+                                                       help=f"Open {filename} in system viewer"):
+                                                import os
+                                                file_path = os.path.abspath(f"data/{filename}")
+                                                st.markdown(f'<a href="file:///{file_path}" target="_blank">Click to open {filename}</a>', 
+                                                           unsafe_allow_html=True)
+                                        
+                                        with btn_col2:
+                                            view_key = f"view_msg_{msg_idx}_{citation['source_num']}"
+                                            # Create a simple download button that opens PDFs naturally
+                                            try:
+                                                with open(f"data/{filename}", "rb") as f:
+                                                    st.download_button(
+                                                        label="📖",
+                                                        data=f.read(),
+                                                        file_name=filename,
+                                                        mime="application/pdf",
+                                                        key=view_key,
+                                                        help=f"Download and view {filename}"
+                                                    )
+                                            except Exception as e:
+                                                st.error(f"Could not access PDF: {e}")
 
 # Chat input
 if query := st.chat_input("Ask a question about your documents..."):
@@ -254,28 +443,129 @@ if query := st.chat_input("Ask a question about your documents..."):
         # Store context for sidebar display
         st.session_state.last_context = result["context_used"]
         
-        # Display the response with tooltips
+        # Display the response with clickable citations
         if result["citations"]:
-            response_with_tooltips = format_response_with_streamlit_tooltips(
+            response_with_navigation = format_response_with_chunk_navigation(
                 result["response_text"], 
                 result["citations"]
             )
-            st.markdown(response_with_tooltips, unsafe_allow_html=True)
+            st.markdown(response_with_navigation, unsafe_allow_html=True)
         else:
             st.write(result["response_text"])
         
-        # Show expandable sources section
+        # Show expandable sources section with navigation
         if result["citations"]:
             with st.expander(f"📚 Sources ({len(result['citations'])} cited)", expanded=False):
-                for citation in result["citations"]:
-                    st.write(f"• **[Source {citation['source_num']}]** {citation['filename']}, p. {citation['page']}")
+                # Use enhanced citations if available
+                citations_to_display = result.get("enhanced_citations", result["citations"])
+                
+                for citation in citations_to_display:
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"• **[Source {citation['source_num']}]** {citation['filename']}, p. {citation['page']}")
+                    
+                    # Add navigation buttons if available
+                    if "navigation_urls" in citation:
+                        with col2:
+                            try:
+                                from citation_navigation import CitationNavigation
+                                nav_handler = CitationNavigation()
+                                # Create unique citation for current response
+                                unique_citation = citation.copy()
+                                unique_citation['unique_key'] = f"current_src_{citation['source_num']}"
+                                nav_handler.create_navigation_buttons(unique_citation, "compact")
+                            except ImportError:
+                                pass
+                    else:
+                        # Enhanced navigation with View Page button
+                        with col2:
+                            filename = citation.get('filename', '')
+                            if filename.endswith('.pdf'):
+                                # Create buttons for different actions
+                                btn_col1, btn_col2 = st.columns(2)
+                                
+                                with btn_col1:
+                                    if st.button(f"🔗", key=f"current_open_{citation['source_num']}", 
+                                               help=f"Open {filename} in system viewer"):
+                                        import os
+                                        file_path = os.path.abspath(f"data/{filename}")
+                                        st.markdown(f'<a href="file:///{file_path}" target="_blank">Click to open {filename}</a>', 
+                                                   unsafe_allow_html=True)
+                                
+                                with btn_col2:
+                                    # Create a simple download button that opens PDFs naturally
+                                    try:
+                                        with open(f"data/{filename}", "rb") as f:
+                                            st.download_button(
+                                                label="📖",
+                                                data=f.read(),
+                                                file_name=filename,
+                                                mime="application/pdf",
+                                                key=f"current_view_{citation['source_num']}",
+                                                help=f"Download and view {filename}"
+                                            )
+                                    except Exception as e:
+                                        st.error(f"Could not access PDF: {e}")
         
-        # Add assistant message to chat history
+        # Add assistant message to chat history with enhanced citations
         st.session_state.messages.append({
             "role": "assistant", 
             "content": result["response_text"],
-            "citations": result["citations"]
+            "citations": result["citations"],
+            "enhanced_citations": result.get("enhanced_citations", result["citations"])  # Store enhanced citations
         })
+
+# Document Viewer Section - Display PDF with chunk navigation when citations are available
+if st.session_state.messages:
+    # Get the last assistant message with citations
+    last_assistant_msg = None
+    for message in reversed(st.session_state.messages):
+        if message["role"] == "assistant" and message.get("citations"):
+            last_assistant_msg = message
+            break
+    
+    if last_assistant_msg and last_assistant_msg.get("citations"):
+        st.markdown("---")
+        
+        # Get unique PDF files from citations
+        pdf_files = {}
+        for citation in last_assistant_msg["citations"]:
+            filename = citation.get("filename", "")
+            if filename.endswith(".pdf"):
+                if filename not in pdf_files:
+                    pdf_files[filename] = []
+                pdf_files[filename].append(citation)
+        
+        if pdf_files:
+            st.markdown('<div class="document-viewer-section">', unsafe_allow_html=True)
+            st.markdown('<div class="document-viewer-header">📄 Document Viewer with Citation Navigation</div>', unsafe_allow_html=True)
+            
+            # Let user select which PDF to view if multiple
+            if len(pdf_files) > 1:
+                selected_pdf = st.selectbox(
+                    "Select document to view:",
+                    list(pdf_files.keys()),
+                    key="pdf_selector"
+                )
+            else:
+                selected_pdf = list(pdf_files.keys())[0]
+            
+            if selected_pdf:
+                st.markdown(f"**📖 Viewing:** {selected_pdf}")
+                st.markdown("*Click on citations in the response above to navigate to specific chunks in the document below.*")
+                
+                # Create the chunk-mapped PDF viewer
+                citations_for_pdf = pdf_files[selected_pdf]
+                chunk_viewer.create_chunk_mapped_viewer(
+                    filename=selected_pdf,
+                    citations=citations_for_pdf,
+                    height=800
+                )
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            # Show info if no PDFs found
+            st.info("💡 **Tip:** When you ask questions that return citations from PDF documents, a document viewer with chunk navigation will appear here.")
 
 # # Show chat stats in sidebar
 # with st.sidebar:
