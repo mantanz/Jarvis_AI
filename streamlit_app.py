@@ -1,12 +1,10 @@
 import streamlit as st
 from processing import load_documents, split_documents, add_to_chroma, clear_database
 from query_data import query_rag
-from chunk_pdf_viewer import ChunkPDFViewer
+import json
+import urllib.parse
 
 st.set_page_config(page_title="RAG Pipeline App", page_icon="📚")
-
-# Initialize chunk PDF viewer
-chunk_viewer = ChunkPDFViewer()
 
 # Custom CSS for citations with chunk navigation
 st.markdown("""
@@ -165,15 +163,15 @@ document.addEventListener('click', function(event) {
 
 st.title("RAG Pipeline")
 
-# Add info about the new chunk navigation feature
-st.info("✨ **New Feature:** Click on citations (e.g., [Source 1]) in responses to navigate directly to the specific chunk in the document viewer below!")
+# Add info about the new document viewer feature
+st.info("✨ **Document Navigation:** Hover over citations for tooltips, then use the '🔍 Open Document Viewer' buttons in Sources sections to view PDFs with chunk navigation in a new tab!")
 
 st.markdown("---")
 
 
 def format_response_with_chunk_navigation(response_text: str, citations: list) -> str:
     """
-    Format response text with clickable citations that navigate to chunks in the PDF viewer.
+    Format response text with clickable citations and tooltips.
     """
     import re
     
@@ -184,7 +182,7 @@ def format_response_with_chunk_navigation(response_text: str, citations: list) -
     for citation in citations:
         citation_data[citation["source_num"]] = citation
     
-    # Replace citations with clickable, tooltip-enabled spans
+    # Replace citations with tooltip-enabled spans (no click navigation needed here)
     for source_num, citation in citation_data.items():
         # Format tooltip text
         formatted_tooltip = (citation["tooltip_text"]
@@ -197,10 +195,10 @@ def format_response_with_chunk_navigation(response_text: str, citations: list) -
                           .replace('"', '&quot;')
                           .replace("'", "&#39;"))
         
-        # Create clickable citation with chunk navigation
-        citation_html = f'''<span class="tooltip citation-clickable" data-source-num="{source_num}" onclick="navigateToChunk({source_num})" style="cursor: pointer;">[Source {source_num}]<span class="tooltiptext">{escaped_tooltip}</span></span>'''
+        # Create citation with tooltip (navigation will be via buttons in sources section)
+        citation_html = f'''<span class="tooltip citation-clickable" style="cursor: help;">[Source {source_num}]<span class="tooltiptext">{escaped_tooltip}</span></span>'''
         
-        # Replace [Source X] with clickable citation
+        # Replace [Source X] with citation
         formatted_response = re.sub(
             f'\\[Source {source_num}\\]',
             citation_html,
@@ -208,6 +206,30 @@ def format_response_with_chunk_navigation(response_text: str, citations: list) -
         )
     
     return formatted_response
+
+def create_document_viewer_url(filename: str, citations: list, active_source: int = None) -> str:
+    """Create URL for standalone document viewer with chunk data."""
+    # Prepare chunk data for URL
+    chunk_data = []
+    for citation in citations:
+        if citation.get('filename') == filename:
+            chunk_data.append({
+                'source_num': citation.get('source_num'),
+                'page': citation.get('page'),
+                'tooltip_text': citation.get('tooltip_text', '')
+            })
+    
+    # Encode data for URL
+    chunks_encoded = urllib.parse.quote(json.dumps(chunk_data))
+    
+    # Create URL for standalone viewer (runs on port 8503)
+    base_url = "http://localhost:8503"
+    viewer_url = f"{base_url}/?file={filename}&chunks={chunks_encoded}"
+    
+    if active_source:
+        viewer_url += f"&active=chunk-{active_source}"
+    
+    return viewer_url
 
 # Initialize chat history in session state
 if "messages" not in st.session_state:
@@ -373,58 +395,39 @@ with chat_container:
                 # Show expandable sources section with navigation
                 if message.get("citations"):
                     with st.expander(f"📚 Sources ({len(message['citations'])} cited)", expanded=False):
-                        # Try to use enhanced citations with navigation
-                        citations_to_display = message.get("enhanced_citations", message.get("citations", []))
+                        citations_to_display = message.get("citations", [])
                         
+                        # Group citations by filename for better organization
+                        citations_by_file = {}
                         for citation in citations_to_display:
-                            col1, col2 = st.columns([3, 1])
-                            with col1:
-                                st.write(f"• **[Source {citation['source_num']}]** {citation['filename']}, p. {citation['page']}")
-                            
-                            # Add navigation buttons if available
-                            if "navigation_urls" in citation:
-                                with col2:
-                                    try:
-                                        from citation_navigation import CitationNavigation
-                                        nav_handler = CitationNavigation()
-                                        # Create unique citation for navigation with message index
-                                        unique_citation = citation.copy()
-                                        unique_citation['unique_key'] = f"msg_{msg_idx}_src_{citation['source_num']}"
-                                        nav_handler.create_navigation_buttons(unique_citation, "compact")
-                                    except ImportError:
-                                        pass
+                            filename = citation.get('filename', 'Unknown')
+                            if filename not in citations_by_file:
+                                citations_by_file[filename] = []
+                            citations_by_file[filename].append(citation)
+                        
+                        for filename, file_citations in citations_by_file.items():
+                            if filename.endswith('.pdf'):
+                                st.markdown(f"**📄 {filename}**")
+                                
+                                # Create a button to open the document viewer with all citations
+                                viewer_url = create_document_viewer_url(filename, file_citations)
+                                st.markdown(f'<a href="{viewer_url}" target="_blank" style="text-decoration: none;"><button style="background: #2196f3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-bottom: 10px;">🔍 Open Document Viewer</button></a>', unsafe_allow_html=True)
+                                
+                                # List the citations for this file
+                                for citation in file_citations:
+                                    col1, col2 = st.columns([4, 1])
+                                    with col1:
+                                        st.write(f"   • **[Source {citation['source_num']}]** Page {citation['page']}")
+                                    with col2:
+                                        # Button to open viewer focused on this specific citation
+                                        focused_url = create_document_viewer_url(filename, file_citations, citation['source_num'])
+                                        st.markdown(f'<a href="{focused_url}" target="_blank" style="text-decoration: none;"><button style="background: #ff9800; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;">📍 Go to Source</button></a>', unsafe_allow_html=True)
+                                
+                                st.markdown("---")
                             else:
-                                # Enhanced navigation with View Page button
-                                with col2:
-                                    filename = citation.get('filename', '')
-                                    if filename.endswith('.pdf'):
-                                        # Create buttons for different actions
-                                        btn_col1, btn_col2 = st.columns(2)
-                                        
-                                        with btn_col1:
-                                            unique_key = f"open_msg_{msg_idx}_{citation['source_num']}"
-                                            if st.button(f"🔗", key=unique_key, 
-                                                       help=f"Open {filename} in system viewer"):
-                                                import os
-                                                file_path = os.path.abspath(f"data/{filename}")
-                                                st.markdown(f'<a href="file:///{file_path}" target="_blank">Click to open {filename}</a>', 
-                                                           unsafe_allow_html=True)
-                                        
-                                        with btn_col2:
-                                            view_key = f"view_msg_{msg_idx}_{citation['source_num']}"
-                                            # Create a simple download button that opens PDFs naturally
-                                            try:
-                                                with open(f"data/{filename}", "rb") as f:
-                                                    st.download_button(
-                                                        label="📖",
-                                                        data=f.read(),
-                                                        file_name=filename,
-                                                        mime="application/pdf",
-                                                        key=view_key,
-                                                        help=f"Download and view {filename}"
-                                                    )
-                                            except Exception as e:
-                                                st.error(f"Could not access PDF: {e}")
+                                # Non-PDF files
+                                for citation in file_citations:
+                                    st.write(f"• **[Source {citation['source_num']}]** {citation['filename']}, p. {citation['page']}")
 
 # Chat input
 if query := st.chat_input("Ask a question about your documents..."):
@@ -456,56 +459,39 @@ if query := st.chat_input("Ask a question about your documents..."):
         # Show expandable sources section with navigation
         if result["citations"]:
             with st.expander(f"📚 Sources ({len(result['citations'])} cited)", expanded=False):
-                # Use enhanced citations if available
-                citations_to_display = result.get("enhanced_citations", result["citations"])
+                citations_to_display = result["citations"]
                 
+                # Group citations by filename
+                citations_by_file = {}
                 for citation in citations_to_display:
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"• **[Source {citation['source_num']}]** {citation['filename']}, p. {citation['page']}")
-                    
-                    # Add navigation buttons if available
-                    if "navigation_urls" in citation:
-                        with col2:
-                            try:
-                                from citation_navigation import CitationNavigation
-                                nav_handler = CitationNavigation()
-                                # Create unique citation for current response
-                                unique_citation = citation.copy()
-                                unique_citation['unique_key'] = f"current_src_{citation['source_num']}"
-                                nav_handler.create_navigation_buttons(unique_citation, "compact")
-                            except ImportError:
-                                pass
+                    filename = citation.get('filename', 'Unknown')
+                    if filename not in citations_by_file:
+                        citations_by_file[filename] = []
+                    citations_by_file[filename].append(citation)
+                
+                for filename, file_citations in citations_by_file.items():
+                    if filename.endswith('.pdf'):
+                        st.markdown(f"**📄 {filename}**")
+                        
+                        # Create a button to open the document viewer with all citations
+                        viewer_url = create_document_viewer_url(filename, file_citations)
+                        st.markdown(f'<a href="{viewer_url}" target="_blank" style="text-decoration: none;"><button style="background: #2196f3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-bottom: 10px;">🔍 Open Document Viewer</button></a>', unsafe_allow_html=True)
+                        
+                        # List the citations for this file
+                        for citation in file_citations:
+                            col1, col2 = st.columns([4, 1])
+                            with col1:
+                                st.write(f"   • **[Source {citation['source_num']}]** Page {citation['page']}")
+                            with col2:
+                                # Button to open viewer focused on this specific citation
+                                focused_url = create_document_viewer_url(filename, file_citations, citation['source_num'])
+                                st.markdown(f'<a href="{focused_url}" target="_blank" style="text-decoration: none;"><button style="background: #ff9800; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 12px;">📍 Go to Source</button></a>', unsafe_allow_html=True)
+                        
+                        st.markdown("---")
                     else:
-                        # Enhanced navigation with View Page button
-                        with col2:
-                            filename = citation.get('filename', '')
-                            if filename.endswith('.pdf'):
-                                # Create buttons for different actions
-                                btn_col1, btn_col2 = st.columns(2)
-                                
-                                with btn_col1:
-                                    if st.button(f"🔗", key=f"current_open_{citation['source_num']}", 
-                                               help=f"Open {filename} in system viewer"):
-                                        import os
-                                        file_path = os.path.abspath(f"data/{filename}")
-                                        st.markdown(f'<a href="file:///{file_path}" target="_blank">Click to open {filename}</a>', 
-                                                   unsafe_allow_html=True)
-                                
-                                with btn_col2:
-                                    # Create a simple download button that opens PDFs naturally
-                                    try:
-                                        with open(f"data/{filename}", "rb") as f:
-                                            st.download_button(
-                                                label="📖",
-                                                data=f.read(),
-                                                file_name=filename,
-                                                mime="application/pdf",
-                                                key=f"current_view_{citation['source_num']}",
-                                                help=f"Download and view {filename}"
-                                            )
-                                    except Exception as e:
-                                        st.error(f"Could not access PDF: {e}")
+                        # Non-PDF files
+                        for citation in file_citations:
+                            st.write(f"• **[Source {citation['source_num']}]** {citation['filename']}, p. {citation['page']}")
         
         # Add assistant message to chat history with enhanced citations
         st.session_state.messages.append({
@@ -515,57 +501,20 @@ if query := st.chat_input("Ask a question about your documents..."):
             "enhanced_citations": result.get("enhanced_citations", result["citations"])  # Store enhanced citations
         })
 
-# Document Viewer Section - Display PDF with chunk navigation when citations are available
+# Document Navigation Instructions
 if st.session_state.messages:
-    # Get the last assistant message with citations
-    last_assistant_msg = None
-    for message in reversed(st.session_state.messages):
-        if message["role"] == "assistant" and message.get("citations"):
-            last_assistant_msg = message
-            break
+    # Check if there are any PDF citations
+    has_pdf_citations = False
+    for message in st.session_state.messages:
+        if message.get("role") == "assistant" and message.get("citations"):
+            for citation in message["citations"]:
+                if citation.get("filename", "").endswith(".pdf"):
+                    has_pdf_citations = True
+                    break
     
-    if last_assistant_msg and last_assistant_msg.get("citations"):
+    if has_pdf_citations:
         st.markdown("---")
-        
-        # Get unique PDF files from citations
-        pdf_files = {}
-        for citation in last_assistant_msg["citations"]:
-            filename = citation.get("filename", "")
-            if filename.endswith(".pdf"):
-                if filename not in pdf_files:
-                    pdf_files[filename] = []
-                pdf_files[filename].append(citation)
-        
-        if pdf_files:
-            st.markdown('<div class="document-viewer-section">', unsafe_allow_html=True)
-            st.markdown('<div class="document-viewer-header">📄 Document Viewer with Citation Navigation</div>', unsafe_allow_html=True)
-            
-            # Let user select which PDF to view if multiple
-            if len(pdf_files) > 1:
-                selected_pdf = st.selectbox(
-                    "Select document to view:",
-                    list(pdf_files.keys()),
-                    key="pdf_selector"
-                )
-            else:
-                selected_pdf = list(pdf_files.keys())[0]
-            
-            if selected_pdf:
-                st.markdown(f"**📖 Viewing:** {selected_pdf}")
-                st.markdown("*Click on citations in the response above to navigate to specific chunks in the document below.*")
-                
-                # Create the chunk-mapped PDF viewer
-                citations_for_pdf = pdf_files[selected_pdf]
-                chunk_viewer.create_chunk_mapped_viewer(
-                    filename=selected_pdf,
-                    citations=citations_for_pdf,
-                    height=800
-                )
-            
-            st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            # Show info if no PDFs found
-            st.info("💡 **Tip:** When you ask questions that return citations from PDF documents, a document viewer with chunk navigation will appear here.")
+        st.info("📄 **Document Navigation:** Use the '🔍 Open Document Viewer' buttons in the Sources sections above to view PDFs with chunk navigation in a new tab. The '📍 Go to Source' buttons will take you directly to specific citations.")
 
 # # Show chat stats in sidebar
 # with st.sidebar:
