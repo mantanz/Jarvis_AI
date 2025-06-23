@@ -16,9 +16,15 @@ PROMPT_TEMPLATE = """
 Answer the question based only on the following context. Provide a detailed answer which is complete and covers the topics of the context while being only answering through the context provided. 
 When making claims or statements, include inline citations using the format [Source X], where X is the source number provided.
 
+CRITICAL INSTRUCTIONS:
+- CAREFULLY READ AND ANALYZE ALL SOURCES PROVIDED before concluding anything
+- Check every single source thoroughly for relevant information
+- Look for variations in terminology (e.g., "H11", "hypothesis 11", "hypothesis H11", etc.)
+- Do not conclude "cannot be determined" unless you have genuinely checked ALL sources
+
 You must strictly follow these citation rules:
 
-1. CRITICAL: Every single factual claim, definition, or piece of information must include an inline citation in the format [Source X]. 
+1. CRITICAL: Every single factual claim, definition, or piece of information must include an inline citation in the format [Source X].
 2. IMPORTANT: The response should indicate exactly the source the fact was taken from.
 3. If you use information from multiple sources in one sentence, you MUST cite ALL relevant sources like [Source 1][Source 3].4. Do not combine information from different sources without citing each source separately.
 4. VERY IMPORTANT: Do not refer to source numbers in the body of the sentence. For example, write "The lion is the king of the jungle[Source 1]," not "Source 1 states that the lion is the king of the jungle."

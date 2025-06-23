@@ -35,13 +35,49 @@ def load_documents():
 
 
 def split_documents(documents: list[Document]):
+    # Custom paragraph-aware text splitter
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=800,
         chunk_overlap=80,
         length_function=len,
         is_separator_regex=False,
+        # Add paragraph separators as primary split points
+        separators=["\n\n", "\n"]  # Prioritize paragraph breaks
     )
-    return text_splitter.split_documents(documents)
+    
+    chunks = []
+    
+    for doc in documents:
+        # First, split the document into paragraphs
+        paragraphs = doc.page_content.split('\n\n')
+        
+        # Process each paragraph separately to maintain paragraph boundaries
+        for para_idx, paragraph in enumerate(paragraphs, 1):
+            if not paragraph.strip():  # Skip empty paragraphs
+                continue
+                
+            # Create a temporary document for this paragraph
+            para_doc = Document(
+                page_content=paragraph,
+                metadata={
+                    **doc.metadata,
+                    "paragraph_num": para_idx
+                }
+            )
+            
+            # Split the paragraph into chunks if it's too long
+            para_chunks = text_splitter.split_documents([para_doc])
+            
+            # If paragraph fits in one chunk, keep it as is
+            if len(para_chunks) == 1:
+                chunks.append(para_chunks[0])
+            else:
+                # If paragraph needs to be split, add chunk numbers within the paragraph
+                for chunk_idx, chunk in enumerate(para_chunks):
+                    chunk.metadata["chunk_in_paragraph"] = chunk_idx + 1
+                    chunks.append(chunk)
+    
+    return chunks
 
 
 def add_to_chroma(chunks: list[Document]):
@@ -74,30 +110,34 @@ def add_to_chroma(chunks: list[Document]):
 
 
 def calculate_chunk_ids(chunks):
+    # This will create IDs like "data/monopoly.pdf:6:2:1"
+    # Format: Source : Page Number : Paragraph Number : Chunk Index
 
-    # This will create IDs like "data/monopoly.pdf:6:2"
-    # Page Source : Page Number : Chunk Index
-
-    last_page_id = None
+    # Track the last combination to generate sequential chunk indices
+    last_para_id = None
     current_chunk_index = 0
 
     for chunk in chunks:
         source = chunk.metadata.get("source")
         page = chunk.metadata.get("page")
-        current_page_id = f"{source}:{page}"
+        paragraph_num = chunk.metadata.get("paragraph_num", 1)
+        
+        # Create paragraph-level ID
+        current_para_id = f"{source}:{page}:{paragraph_num}"
 
-        # If the page ID is the same as the last one, increment the index.
-        if current_page_id == last_page_id:
+        # If the paragraph ID is the same as the last one, increment the chunk index
+        if current_para_id == last_para_id:
             current_chunk_index += 1
         else:
-            current_chunk_index = 0
+            current_chunk_index = 1  # Start at 1 for each new paragraph
 
-        # Calculate the chunk ID.
-        chunk_id = f"{current_page_id}:{current_chunk_index}"
-        last_page_id = current_page_id
+        # Calculate the chunk ID in the new format
+        chunk_id = f"{current_para_id}:{current_chunk_index}"
+        last_para_id = current_para_id
 
-        # Add it to the page meta-data.
+        # Add it to the chunk metadata
         chunk.metadata["id"] = chunk_id
+        chunk.metadata["paragraph_id"] = current_para_id
 
     return chunks
 

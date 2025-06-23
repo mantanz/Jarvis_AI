@@ -23,25 +23,69 @@ class CitationManager:
             source_id = doc.metadata.get("id", "Unknown")
             source_parts = source_id.split(":")
             
-            if len(source_parts) >= 2:
+            # Parse the new format: file:page:paragraph:chunk
+            if len(source_parts) >= 4:
+                file_path, page_num, paragraph_num, chunk_num = source_parts[0], source_parts[1], source_parts[2], source_parts[3]
+                filename = file_path.split("/")[-1] if "/" in file_path else file_path
+                # Create a more informative page reference
+                page_ref = f"{page_num} (¶{paragraph_num}.{chunk_num})"
+            elif len(source_parts) >= 3:
+                file_path, page_num, paragraph_num = source_parts[0], source_parts[1], source_parts[2]
+                filename = file_path.split("/")[-1] if "/" in file_path else file_path
+                page_ref = f"{page_num} (¶{paragraph_num})"
+            elif len(source_parts) >= 2:
                 file_path, page_num = source_parts[0], source_parts[1]
                 filename = file_path.split("/")[-1] if "/" in file_path else file_path
+                page_ref = page_num
             else:
-                filename, page_num = "Unknown Document", "N/A"
+                filename, page_ref = "Unknown Document", "N/A"
             
             clean_content = strip_html_tags(doc.page_content)
+            
+            # Remove PDF filename references from content
+            clean_content = self._remove_filename_references(clean_content, filename)
             
             citations.append(
                 Citation(
                     source_num=i,
                     filename=filename,
-                    page=page_num,
+                    page=page_ref,  # Now includes paragraph info
                     source_id=source_id,
                     relevance_score=round(1 - score, 3) if score is not None else None,
                     content=clean_content
                 )
             )
         return citations
+
+    def _remove_filename_references(self, content: str, filename: str) -> str:
+        """Remove filename and common document metadata from content."""
+        import re
+        
+        # Remove file extension and get base name
+        base_filename = filename.replace('.pdf', '').replace('.txt', '').replace('.docx', '')
+        
+        # Remove various patterns that might include filename
+        patterns_to_remove = [
+            # Exact filename matches at end of content
+            rf'\s*{re.escape(filename)}\s*$',
+            rf'\s*{re.escape(base_filename)}\s*$',
+            # Common patterns with numbers (like "effective headline 1311")
+            rf'\s*{re.escape(base_filename)}\s*\d+\s*$',
+            # Remove trailing numbers that might be page numbers or file references
+            r'\s*\d{3,4}\s*$',  # Remove 3-4 digit numbers at end
+            # Remove common document footers
+            r'\s*Page \d+.*$',
+            r'\s*p\.\s*\d+.*$',
+            r'\s*\d+/\d+\s*$',  # Page numbers like "1/10"
+            # Remove trailing whitespace and cleanup
+            r'\s+$'
+        ]
+        
+        cleaned_content = content
+        for pattern in patterns_to_remove:
+            cleaned_content = re.sub(pattern, '', cleaned_content, flags=re.IGNORECASE)
+        
+        return cleaned_content.strip()
 
     def get_llm_context(self) -> str:
         """Formats the context string to be passed to the LLM."""
