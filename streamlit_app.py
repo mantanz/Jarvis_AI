@@ -164,7 +164,7 @@ document.addEventListener('click', function(event) {
 st.title("RAG Pipeline")
 
 # Add info about the new document viewer feature
-st.info("✨ **Document Navigation:** Hover over citations for tooltips, then use the '🔍 Open Document Viewer' buttons in Sources sections to view PDFs with chunk navigation in a new tab!")
+
 
 st.markdown("---")
 
@@ -514,7 +514,6 @@ if st.session_state.messages:
     
     if has_pdf_citations:
         st.markdown("---")
-        st.info("📄 **Document Navigation:** Use the '🔍 Open Document Viewer' buttons in the Sources sections above to view PDFs with chunk navigation in a new tab. The '📍 Go to Source' buttons will take you directly to specific citations.")
 
 # # Show chat stats in sidebar
 # with st.sidebar:

@@ -91,17 +91,16 @@ class StandalonePDFViewer:
             source_num = chunk.get('source_num', 1)
             chunk_id = f"chunk-{source_num}"
             
-            # Extract page number and add 1 for correct PDF navigation
-            page = chunk.get('page', '1')
-            import re
-            page_match = re.search(r'(\d+)', str(page))
-            page_num = int(page_match.group(1)) + 1 if page_match else 2
+            # Use the page number as-is (already corrected in processing.py)
+            page = chunk.get('page', 1)
+            page_num = int(page) if isinstance(page, (int, str)) else 1
             
             chunk_map[chunk_id] = {
                 'source_num': source_num,
                 'page': page_num,
                 'content': chunk.get('tooltip_text', '')[:200] + "...",
-                'full_content': chunk.get('tooltip_text', '')
+                'full_content': chunk.get('tooltip_text', ''),
+                'search_text': chunk.get('tooltip_text', '')[:100]  # First 100 chars for search
             }
         
         # Generate the HTML for the standalone viewer
@@ -113,6 +112,144 @@ class StandalonePDFViewer:
     def _generate_html(self, pdf_data: str, filename: str, chunk_map: Dict, active_chunk: str = "") -> str:
         """Generate HTML for the standalone PDF viewer."""
         chunk_map_json = json.dumps(chunk_map)
+        
+        # JavaScript code for highlighting - moved outside f-string to avoid conflicts
+        highlight_js = """
+                function highlightChunk(chunkId) {
+                    const chunk = chunkMap[chunkId];
+                    const container = document.getElementById('pdf-container');
+                    
+                    // Remove existing highlights
+                    container.querySelectorAll('.highlight-overlay').forEach(el => el.remove());
+                    
+                    // Get the current page and search for text
+                    if (pdfDoc && pageNum === chunk.page) {
+                        pdfDoc.getPage(pageNum).then(function(page) {
+                            return page.getTextContent();
+                        }).then(function(textContent) {
+                            // Search for the chunk text in the page
+                            const searchText = chunk.search_text.toLowerCase().trim();
+                            if (!searchText) return;
+                            
+                            // Find matching text items
+                            let matchingItems = [];
+                            let searchWords = searchText.split(/\\s+/).slice(0, 5); // First 5 words
+                            
+                            for (let i = 0; i < textContent.items.length; i++) {
+                                const item = textContent.items[i];
+                                const itemText = item.str.toLowerCase();
+                                
+                                // Check if this item contains any of our search words
+                                for (let word of searchWords) {
+                                    if (word.length > 3 && itemText.includes(word)) {
+                                        matchingItems.push(item);
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // If we found matching items, highlight them
+                            if (matchingItems.length > 0) {
+                                const viewport = page.getViewport({scale: scale});
+                                
+                                matchingItems.forEach((item, index) => {
+                                    if (index < 3) { // Max 3 highlights per chunk
+                                        const transform = pdfjsLib.Util.transform(
+                                            viewport.transform,
+                                            item.transform
+                                        );
+                                        
+                                        const highlight = document.createElement('div');
+                                        highlight.className = 'highlight-overlay';
+                                        
+                                        const x = transform[4];
+                                        const y = transform[5];
+                                        const width = item.width * scale;
+                                        const height = item.height * scale;
+                                        
+                                        // Position relative to canvas
+                                        const canvasRect = canvas.getBoundingClientRect();
+                                        const containerRect = container.getBoundingClientRect();
+                                        
+                                        const leftPos = x + (canvasRect.left - containerRect.left);
+                                        const topPos = viewport.height - y - height + (canvasRect.top - containerRect.top);
+                                        const widthVal = Math.max(width, 100);
+                                        const heightVal = Math.max(height, 20);
+                                        
+                                        highlight.style.cssText = 
+                                            'position: absolute;' +
+                                            'left: ' + leftPos + 'px;' +
+                                            'top: ' + topPos + 'px;' +
+                                            'width: ' + widthVal + 'px;' +
+                                            'height: ' + heightVal + 'px;' +
+                                            'background: rgba(255, 235, 59, 0.6);' +
+                                            'border: 2px solid #ffc107;' +
+                                            'border-radius: 4px;' +
+                                            'pointer-events: none;' +
+                                            'z-index: 10;' +
+                                            'animation: fadeHighlight 3s ease-in-out;';
+                                        
+                                        container.appendChild(highlight);
+                                        setTimeout(() => highlight.remove(), 4000);
+                                    }
+                                });
+                            } else {
+                                // Fallback: create a general highlight in the middle of the page
+                                const highlight = document.createElement('div');
+                                highlight.className = 'highlight-overlay';
+                                
+                                const canvasRect = canvas.getBoundingClientRect();
+                                const containerRect = container.getBoundingClientRect();
+                                
+                                const leftPos = (canvasRect.left - containerRect.left) + canvas.width * 0.1;
+                                const topPos = (canvasRect.top - containerRect.top) + canvas.height * 0.3;
+                                const widthVal = canvas.width * 0.8;
+                                
+                                highlight.style.cssText = 
+                                    'position: absolute;' +
+                                    'left: ' + leftPos + 'px;' +
+                                    'top: ' + topPos + 'px;' +
+                                    'width: ' + widthVal + 'px;' +
+                                    'height: 60px;' +
+                                    'background: rgba(255, 235, 59, 0.4);' +
+                                    'border: 2px solid #ffc107;' +
+                                    'border-radius: 8px;' +
+                                    'pointer-events: none;' +
+                                    'z-index: 10;' +
+                                    'animation: fadeHighlight 3s ease-in-out;' +
+                                    'display: flex;' +
+                                    'align-items: center;' +
+                                    'justify-content: center;' +
+                                    'color: #333;' +
+                                    'font-weight: bold;' +
+                                    'font-size: 14px;';
+                                
+                                highlight.innerHTML = '📍 Source ' + chunk.source_num + ' content is on this page';
+                                container.appendChild(highlight);
+                                setTimeout(() => highlight.remove(), 4000);
+                            }
+                        }).catch(function(error) {
+                            console.log('Text search error:', error);
+                            // Fallback highlight
+                            const highlight = document.createElement('div');
+                            highlight.className = 'highlight-overlay';
+                            highlight.style.cssText = 
+                                'position: absolute;' +
+                                'top: 100px;' +
+                                'left: ' + (canvas.width * 0.1) + 'px;' +
+                                'width: ' + (canvas.width * 0.8) + 'px;' +
+                                'height: 50px;' +
+                                'background: rgba(255, 235, 59, 0.6);' +
+                                'border: 2px solid #ffc107;' +
+                                'border-radius: 4px;' +
+                                'pointer-events: none;' +
+                                'z-index: 10;' +
+                                'animation: fadeHighlight 3s ease-in-out;';
+                            container.appendChild(highlight);
+                            setTimeout(() => highlight.remove(), 3000);
+                        });
+                    }
+                }"""
         
         return f"""
         <!DOCTYPE html>
@@ -205,11 +342,10 @@ class StandalonePDFViewer:
                         chunkItem.id = 'sidebar-' + chunkId;
                         chunkItem.onclick = () => navigateToChunk(chunkId);
                         
-                        chunkItem.innerHTML = `
-                            <div class="chunk-header">Source ${{chunk.source_num}}</div>
-                            <div class="chunk-page">Page ${{chunk.page}}</div>
-                            <div class="chunk-preview">${{chunk.content}}</div>
-                        `;
+                        chunkItem.innerHTML = 
+                            '<div class="chunk-header">Source ' + chunk.source_num + '</div>' +
+                            '<div class="chunk-page">Page ' + chunk.page + '</div>' +
+                            '<div class="chunk-preview">' + chunk.content + '</div>';
                         
                         chunkList.appendChild(chunkItem);
                     }});
@@ -233,30 +369,7 @@ class StandalonePDFViewer:
                     setTimeout(() => highlightChunk(chunkId), 500);
                 }}
                 
-                function highlightChunk(chunkId) {{
-                    const chunk = chunkMap[chunkId];
-                    const container = document.getElementById('pdf-container');
-                    
-                    container.querySelectorAll('.highlight-overlay').forEach(el => el.remove());
-                    
-                    const highlight = document.createElement('div');
-                    highlight.className = 'highlight-overlay';
-                    
-                    const highlightHeight = 50;
-                    const highlightWidth = canvas.width * 0.8;
-                    const highlightTop = (chunk.source_num % 8) * 80 + 100;
-                    const highlightLeft = canvas.width * 0.1;
-                    
-                    highlight.style.cssText = `
-                        top: ${{highlightTop}}px;
-                        left: ${{highlightLeft}}px;
-                        width: ${{highlightWidth}}px;
-                        height: ${{highlightHeight}}px;
-                    `;
-                    
-                    container.appendChild(highlight);
-                    setTimeout(() => highlight.remove(), 3000);
-                }}
+                {highlight_js}
                 
                 function renderPage(num) {{
                     pdfDoc.getPage(num).then(function(page) {{
