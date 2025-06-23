@@ -57,10 +57,11 @@ class ChunkPDFViewer:
             page = citation.get('page', '1')
             content = citation.get('tooltip_text', '')
             
-            # Extract page number
+            # Extract page number and add 1 for correct PDF navigation
+            # The page numbers in citations are 1-based, but PDF viewer needs +1 offset
             import re
             page_match = re.search(r'(\d+)', str(page))
-            page_num = int(page_match.group(1)) if page_match else 1
+            page_num = int(page_match.group(1)) + 1 if page_match else 2
             
             # Create chunk ID
             chunk_id = f"chunk-{source_num}"
