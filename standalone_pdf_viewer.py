@@ -60,7 +60,7 @@ class StandalonePDFViewer:
         # Minimal header
         col1, col2, col3 = st.columns([1, 3, 1])
         with col1:
-            st.markdown("🔙 **[Back to Chat](http://localhost:8501)**")
+            st.markdown("🔙 **[Back to Chat](http://localhost:8502)**")
         with col2:
             st.markdown(f"<h2 style='text-align: center; margin: 0;'>📄 {filename}</h2>", unsafe_allow_html=True)
         with col3:
@@ -239,8 +239,12 @@ class StandalonePDFViewer:
                             spanInfo.span.classList.add('highlight');
                             spanInfo.span.style.background = 'rgba(255, 193, 7, 0.7)';
                             spanInfo.span.style.border = '2px solid #ff9800';
-                            spanInfo.span.style.borderRadius = '4px';
+                            spanInfo.span.style.borderRadius = '6px';
                             spanInfo.span.style.boxShadow = '0 0 10px rgba(255, 152, 0, 0.5)';
+                            spanInfo.span.style.display = 'inline-block';
+                            spanInfo.span.style.padding = '2px 4px';
+                            spanInfo.span.style.marginLeft = '-2px'; // or use translateX
+
                             
                             highlightedCount++;
                             

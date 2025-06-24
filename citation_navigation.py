@@ -90,77 +90,6 @@ class CitationNavigation:
             return int(match.group(1))
         return 1
     
-    def create_navigation_buttons(self, citation: Dict[str, Any], button_style: str = "compact") -> None:
-        """
-        Create navigation buttons for a citation.
-        
-        Args:
-            citation: Enhanced citation dictionary with navigation info
-            button_style: Style of buttons ("compact", "full", "minimal")
-        """
-        if "navigation_urls" not in citation:
-            return
-        
-        nav_urls = citation["navigation_urls"]
-        doc_info = citation.get("document_info", {})
-        filename = doc_info.get("filename", "Unknown")
-        page = doc_info.get("page", "1")
-        
-        if not doc_info.get("exists", False):
-            st.warning(f"📄 Document not found: {filename}")
-            return
-        
-        if button_style == "compact":
-            col1, col2, col3 = st.columns(3)
-            
-            # Create unique keys for buttons
-            unique_key = citation.get('unique_key', f"src_{citation['source_num']}")
-            
-            with col1:
-                if st.button(f"🔗 Open {filename}", key=f"open_{unique_key}", 
-                           help=f"Open {filename} in system PDF viewer"):
-                    st.markdown(f'<a href="{nav_urls["system"]}" target="_blank">Click here if the document doesn\'t open automatically</a>', 
-                               unsafe_allow_html=True)
-                    # Try to open with JavaScript
-                    st.components.v1.html(f"""
-                        <script>
-                            window.open('{nav_urls["system"]}', '_blank');
-                        </script>
-                    """, height=0)
-            
-            with col2:
-                if st.button(f"📖 View Page {page}", key=f"view_{unique_key}", 
-                           help=f"View {filename} page {page} in embedded viewer"):
-                    self._show_embedded_pdf(filename, int(self._extract_page_number(page)))
-            
-            with col3:
-                download_key = f"download_{unique_key}"
-                self.pdf_viewer.display_pdf_download_button(filename, f"💾 Download", key=download_key)
-        
-        elif button_style == "full":
-            st.markdown(f"**📄 {filename} - Page {page}**")
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            # Create unique keys for buttons
-            unique_key = citation.get('unique_key', f"src_{citation['source_num']}")
-            
-            with col1:
-                if st.button("🔗 System Viewer", key=f"sys_{unique_key}"):
-                    self._open_in_system(nav_urls["system"])
-            
-            with col2:
-                if st.button("📖 Embedded View", key=f"embed_{unique_key}"):
-                    self._show_embedded_pdf(filename, int(self._extract_page_number(page)))
-            
-            with col3:
-                download_key = f"download_full_{unique_key}"
-                self.pdf_viewer.display_pdf_download_button(filename, "💾 Download", key=download_key)
-            
-            with col4:
-                if st.button("📍 Navigate", key=f"nav_detail_{unique_key}"):
-                    self._show_navigation_details(citation)
-    
     def _open_in_system(self, system_url: str) -> None:
         """Helper to open document in system viewer."""
         st.markdown(f'<a href="{system_url}" target="_blank">🔗 Click here to open the document</a>', 
@@ -225,34 +154,9 @@ class CitationNavigation:
             
             navigation_section = f"""
 
-📍 Location: {filename}, Page {page}
-🔗 Right-click citation to open document
-📖 Use document viewer for detailed view"""
+            📍 Location: {filename}, Page {page}
+            🔗 Right-click citation to open document
+            📖 Use document viewer for detailed view
+            """
         
         return base_tooltip + navigation_section
-    
-    def get_document_browser(self) -> None:
-        """Display a document browser showing all available documents."""
-        st.markdown("### 📚 Document Library")
-        
-        documents = self.document_service.get_available_documents()
-        
-        if not documents:
-            st.info("No documents found in the data directory.")
-            return
-        
-        for doc in documents:
-            with st.expander(f"📄 {doc['filename']} ({doc['size']/1024:.1f} KB)"):
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    if st.button(f"🔗 Open", key=f"browser_open_{doc['filename']}"):
-                        self._open_in_system(doc['url'])
-                
-                with col2:
-                    if st.button(f"📖 View", key=f"browser_view_{doc['filename']}"):
-                        self._show_embedded_pdf(doc['filename'])
-                
-                with col3:
-                    browser_download_key = f"browser_download_{doc['filename']}"
-                    self.pdf_viewer.display_pdf_download_button(doc['filename'], "💾 Download", key=browser_download_key) 
