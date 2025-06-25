@@ -105,7 +105,7 @@ class CitationManager:
         used_citations_ordered = []
         seen = set()
         for num in cited_original_nums:
-            if num not in seen and 1 <= num <= self.k_chunks:
+            if num not in seen and num in self.lookup:
                 seen.add(num)
                 used_citations_ordered.append(self.lookup[num])
 
