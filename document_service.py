@@ -2,7 +2,6 @@ import os
 import urllib.parse
 from typing import Dict, Optional, Tuple
 from pathlib import Path
-import streamlit as st
 
 class DocumentService:
     """
@@ -16,11 +15,7 @@ class DocumentService:
     
     def _get_base_url(self) -> str:
         """Get the base URL for the application."""
-        try:
-            # Try to get Streamlit's base URL if available
-            return st.get_option('server.baseUrlPath') or ""
-        except:
-            return ""
+        return ""
     
     def parse_chunk_id(self, chunk_id: str) -> Dict[str, str]:
         """
@@ -53,7 +48,7 @@ class DocumentService:
                     "full_path": str(self.data_path / filename)
                 }
         except Exception as e:
-            st.error(f"Error parsing chunk ID {chunk_id}: {e}")
+            print(f"Error parsing chunk ID {chunk_id}: {e}")
             return {
                 "file_path": "unknown",
                 "filename": "unknown",

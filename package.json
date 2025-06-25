@@ -15,7 +15,14 @@
     "lucide-react": "^0.263.1",
     "tailwindcss": "^3.3.2",
     "autoprefixer": "^10.4.14",
-    "postcss": "^8.4.24"
+    "postcss": "^8.4.24",
+    "axios": "^1.6.0",
+    "react-query": "^3.39.3",
+    "react-dropzone": "^14.2.3",
+    "react-hot-toast": "^2.4.1",
+    "clsx": "^2.0.0",
+    "@headlessui/react": "^1.7.17",
+    "framer-motion": "^10.16.4"
   },
   "scripts": {
     "start": "react-scripts start",

@@ -35,35 +35,133 @@ const PDFViewer = () => {
     const file = params.get('file');
     const chunksData = params.get('chunks');
     const active = params.get('active');
-    const fileData = params.get('fileData');
+    const sessionKey = params.get('session');
+
+    console.log('PDF Viewer - URL params:', {
+      file,
+      chunksData: chunksData ? 'present' : 'missing',
+      active,
+      sessionKey,
+      fullURL: location.search,
+      allParams: Object.fromEntries(params.entries())
+    });
 
     if (file) {
       setFilename(file);
+      // Load PDF directly from backend API
+      loadPDFFromBackend(file);
     }
 
-    if (chunksData) {
+    // Try to get citation data from sessionStorage first, then fall back to URL params
+    if (sessionKey) {
+      try {
+        console.log('Attempting to load citation data for key:', sessionKey);
+        
+        // Try localStorage first (more reliable across tabs)
+        let sessionData = localStorage.getItem(sessionKey);
+        let dataSource = 'localStorage';
+        
+        // Fallback to sessionStorage
+        if (!sessionData) {
+          sessionData = sessionStorage.getItem(sessionKey);
+          dataSource = 'sessionStorage';
+        }
+        
+        console.log('Raw citation data from', dataSource, ':', sessionData);
+        
+        if (sessionData) {
+          const parsedData = JSON.parse(sessionData);
+          console.log('PDF Viewer - Loaded citation data:', parsedData);
+          console.log('Citations count:', parsedData.citations?.length || 0);
+          
+          setChunks(parsedData.citations || []);
+          if (parsedData.activeChunk) {
+            setActiveChunk(parsedData.activeChunk);
+          }
+          
+          // Clean up storage
+          localStorage.removeItem(sessionKey);
+          sessionStorage.removeItem(sessionKey);
+        } else {
+          console.log('Citation data not found for key:', sessionKey);
+          console.log('Available localStorage keys:', Object.keys(localStorage).filter(k => k.startsWith('pdfViewer_')));
+          console.log('Available sessionStorage keys:', Object.keys(sessionStorage).filter(k => k.startsWith('pdfViewer_')));
+          
+          // Try to get data from parent window as fallback
+          try {
+            if (window.opener && window.opener.pdfViewerData && window.opener.pdfViewerData[sessionKey]) {
+              const parentData = window.opener.pdfViewerData[sessionKey];
+              console.log('PDF Viewer - Loaded from parent window:', parentData);
+              setChunks(parentData.citations || []);
+              if (parentData.activeChunk) {
+                setActiveChunk(parentData.activeChunk);
+              }
+              // Clean up parent data
+              delete window.opener.pdfViewerData[sessionKey];
+            } else {
+              console.log('No data found in parent window either');
+            }
+          } catch (error) {
+            console.error('Error accessing parent window data:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing citation data:', error);
+        console.error('Session key:', sessionKey);
+      }
+    } else if (chunksData) {
       try {
         const parsedChunks = JSON.parse(decodeURIComponent(chunksData));
+        console.log('PDF Viewer - Parsed chunks from URL:', parsedChunks);
         setChunks(parsedChunks);
       } catch (error) {
         console.error('Error parsing chunks:', error);
+        console.error('Raw chunks data:', chunksData);
       }
+    } else {
+      console.log('No chunks data found in URL parameters or session');
+      setChunks([]); // Clear any existing chunks
     }
 
-    if (active) {
+    if (active && !sessionKey) {
       setActiveChunk(active);
     }
-
-    // Load actual PDF file
-    if (fileData) {
-      try {
-        const fileBlob = new Blob([new Uint8Array(JSON.parse(fileData))], { type: 'application/pdf' });
-        loadPDFFromFile(fileBlob);
-      } catch (error) {
-        console.error('Error creating file from data:', error);
-      }
-    }
   }, [location]);
+
+  const loadPDFFromBackend = async (filename) => {
+    try {
+      setLoading(true);
+      
+      // Fetch PDF directly from backend API
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/documents/${encodeURIComponent(filename)}/download`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      
+      if (arrayBuffer.byteLength === 0) {
+        throw new Error('PDF file is empty');
+      }
+      
+      const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+      const pdf = await loadingTask.promise;
+      
+      setPdfDoc(pdf);
+      setPageCount(pdf.numPages);
+      setLoading(false);
+      
+      // Render first page
+      renderPage(1);
+      
+    } catch (error) {
+      console.error('Error loading PDF from backend:', error);
+      setLoading(false);
+      // You could add an error state here to show user-friendly error messages
+    }
+  };
 
   const loadPDFFromFile = async (file) => {
     try {
@@ -148,7 +246,10 @@ const PDFViewer = () => {
   };
 
   const highlightChunk = (chunkId) => {
-    const chunk = chunks.find(c => `chunk-${c.source_num}` === chunkId);
+    // Try both display_source_num and source_num for compatibility
+    const chunk = chunks.find(c => 
+      `chunk-${c.display_source_num || c.source_num}` === chunkId
+    );
     if (!chunk) return;
 
     // Clear previous highlights
@@ -167,6 +268,12 @@ const PDFViewer = () => {
     // Get the full text content
     let fullText = chunk.tooltip_text || chunk.content || '';
     if (!fullText.trim()) return;
+
+    console.log('Highlighting chunk:', {
+      chunkId,
+      fullText: fullText.substring(0, 100) + '...',
+      filename: chunk.filename
+    });
 
     // Extract first 5 and last 5 words from the chunk
     const words = fullText.split(/\s+/).filter(word => word.length > 0);
@@ -216,7 +323,39 @@ const PDFViewer = () => {
       }
     }
 
-    if (startPos === -1 || endPos === -1 || endPos <= startPos) return;
+    if (startPos === -1 || endPos === -1 || endPos <= startPos) {
+      console.log('Text matching failed, trying keyword-based highlighting');
+      
+      // Fallback: try to match individual significant words
+      const significantWords = words.filter(word => 
+        word.length > 3 && 
+        !['the', 'and', 'that', 'this', 'with', 'from', 'they', 'have', 'been', 'were', 'are'].includes(word.toLowerCase())
+      ).slice(0, 5);
+      
+      let highlightedAny = false;
+      significantWords.forEach(word => {
+        const wordLower = word.toLowerCase();
+        spanTextMap.forEach(spanInfo => {
+          if (spanInfo.text.toLowerCase().includes(wordLower)) {
+            spanInfo.span.style.background = 'rgba(255, 193, 7, 0.4)';
+            spanInfo.span.style.border = '1px solid #ff9800';
+            spanInfo.span.style.borderRadius = '3px';
+            highlightedAny = true;
+          }
+        });
+      });
+      
+      if (!highlightedAny) {
+        // Final fallback: highlight first paragraph area
+        const visibleSpans = spanTextMap.filter(s => s.text.trim().length > 0).slice(0, 15);
+        visibleSpans.forEach(spanInfo => {
+          spanInfo.span.style.background = 'rgba(255, 193, 7, 0.2)';
+          spanInfo.span.style.border = '1px dashed #ff9800';
+          spanInfo.span.style.borderRadius = '2px';
+        });
+      }
+      return;
+    }
 
     // Highlight all spans that fall within the identified text region
     let firstHighlight = null;
@@ -249,13 +388,26 @@ const PDFViewer = () => {
   };
 
   const navigateToChunk = (chunkId) => {
-    const chunk = chunks.find(c => `chunk-${c.source_num}` === chunkId);
+    // Try both display_source_num and source_num for compatibility
+    const chunk = chunks.find(c => 
+      `chunk-${c.display_source_num || c.source_num}` === chunkId
+    );
     if (!chunk) return;
 
     setActiveChunk(chunkId);
     
-    if (chunk.page !== pageNum) {
-      setPageNum(chunk.page);
+    // Parse page number from the page field (e.g., "6 (¶1.1)" -> 6)
+    let targetPage = 1;
+    if (chunk.page) {
+      const pageMatch = chunk.page.toString().match(/^(\d+)/);
+      if (pageMatch) {
+        targetPage = parseInt(pageMatch[1]);
+      }
+    }
+
+    // Navigate to the page if different
+    if (targetPage !== pageNum) {
+      setPageNum(targetPage);
     }
 
     setTimeout(() => {
@@ -290,12 +442,13 @@ const PDFViewer = () => {
   }, [scale, pageNum, loading, pdfDoc]);
 
   useEffect(() => {
-    if (activeChunk && chunks.length > 0) {
+    if (activeChunk && chunks.length > 0 && pdfDoc) {
+      // Navigate to the chunk's page and highlight it
       setTimeout(() => {
-        highlightChunk(activeChunk);
+        navigateToChunk(activeChunk);
       }, 500);
     }
-  }, [activeChunk, chunks]);
+  }, [activeChunk, chunks, pdfDoc]);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -317,7 +470,7 @@ const PDFViewer = () => {
 
         <div className="space-y-3">
           {chunks.map((chunk) => {
-            const chunkId = `chunk-${chunk.source_num}`;
+            const chunkId = `chunk-${chunk.display_source_num || chunk.source_num}`;
             const isActive = activeChunk === chunkId;
             
             return (
@@ -332,7 +485,7 @@ const PDFViewer = () => {
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-blue-600">
-                    Source {chunk.source_num}
+                    Source {chunk.display_source_num || chunk.source_num}
                   </span>
                   <span className="text-xs text-gray-500">
                     Page {chunk.page}

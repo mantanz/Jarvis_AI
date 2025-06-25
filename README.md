@@ -1,192 +1,449 @@
-# React PDF Viewer with RAG Capabilities
+# 🚀 Modern RAG Pipeline - React + FastAPI
 
-A modern React-based PDF viewer that replaces the Streamlit functionality with a sleek, chat-like interface. This application provides PDF viewing capabilities with advanced text highlighting and citation source navigation.
+A complete transformation of the RAG pipeline from Streamlit to a modern React frontend with FastAPI backend. This implementation provides a robust, scalable, and maintainable architecture for document processing and intelligent querying.
 
-## Features
-
-### Main Interface
-- **Modern Chat UI**: Clean, intuitive interface similar to popular chat applications
-- **File Upload**: Drag-and-drop or browse to upload PDF files
-- **Real-time Chat**: Interactive chat with AI assistant for document analysis
-- **Sample Searches**: Quick access to common questions
-- **Google Integration**: Display relevant search results
-- **Notepad**: Built-in note-taking functionality
-
-### PDF Viewer
-- **Advanced PDF Rendering**: Uses PDF.js for high-quality document display
-- **Text Highlighting**: Intelligent highlighting based on first/last 5 words algorithm
-- **Citation Navigation**: Click citation sources to jump to relevant text
-- **Zoom Controls**: In/out zoom functionality
-- **Page Navigation**: Easy navigation between document pages
-- **Responsive Design**: Works on different screen sizes
-
-### Text Highlighting Algorithm
-The application uses an advanced highlighting system that:
-1. Extracts the first 5 and last 5 words from citation chunks
-2. Builds a continuous text map from PDF text layers
-3. Identifies text boundaries using partial matching fallbacks
-4. Highlights entire text regions rather than scattered words
-5. Provides smooth scrolling to highlighted content
-
-## Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd react-pdf-viewer
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Start the development server:**
-   ```bash
-   npm start
-   ```
-
-4. **Open your browser:**
-   Navigate to `http://localhost:3000`
-
-## Usage
-
-### Main Interface
-1. **Upload Documents**: Use the drag-and-drop area or browse button to upload PDF files
-2. **Start Chatting**: Ask questions about your uploaded documents
-3. **Use Samples**: Click on sample searches for quick queries
-4. **Take Notes**: Use the notepad for important observations
-
-### PDF Viewer
-1. **Access Viewer**: Click on uploaded PDF files to open the viewer
-2. **Navigate Citations**: Use the left sidebar to click on citation sources
-3. **View Highlights**: Text will be automatically highlighted when citations are selected
-4. **Control View**: Use zoom and page navigation controls in the header
-5. **Return to Chat**: Click "Back to Chat" to return to the main interface
-
-## Project Structure
+## 🏗️ **ARCHITECTURE OVERVIEW**
 
 ```
-src/
-├── components/
-│   ├── MainInterface.js    # Main chat interface
-│   └── PDFViewer.js        # PDF viewer with highlighting
-├── index.css              # Global styles and Tailwind imports
-├── App.js                 # Main app component with routing
-└── index.js               # React entry point
-
-public/
-└── index.html             # HTML template
-
-Configuration files:
-├── package.json           # Dependencies and scripts
-├── tailwind.config.js     # Tailwind CSS configuration
-└── postcss.config.js      # PostCSS configuration
+┌─────────────────────────────────────────────────────────────────┐
+│                          Frontend (React)                      │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐           │
+│  │ Chat         │ │ Document     │ │ PDF          │           │
+│  │ Interface    │ │ Manager      │ │ Viewer       │           │
+│  └──────────────┘ └──────────────┘ └──────────────┘           │
+│                          │                                     │
+│                    React Context                               │
+│                      (State)                                   │
+└─────────────────────────┼───────────────────────────────────────┘
+                          │ HTTP/REST API
+┌─────────────────────────┼───────────────────────────────────────┐
+│                   Backend (FastAPI)                            │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐           │
+│  │ Document     │ │ RAG          │ │ Citation     │           │
+│  │ Processing   │ │ Pipeline     │ │ Management   │           │
+│  └──────────────┘ └──────────────┘ └──────────────┘           │
+└─────────────────────────┼───────────────────────────────────────┘
+                          │
+┌─────────────────────────┼───────────────────────────────────────┐
+│                     Data Layer                                 │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐           │
+│  │ ChromaDB     │ │ Vector       │ │ PDF          │           │
+│  │ Database     │ │ Embeddings   │ │ Storage      │           │
+│  └──────────────┘ └──────────────┘ └──────────────┘           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## Key Technologies
+## ✨ **KEY FEATURES**
 
-- **React 18**: Modern React with hooks and functional components
-- **React Router**: Client-side routing for navigation
-- **Tailwind CSS**: Utility-first CSS framework for styling
-- **PDF.js**: Mozilla's PDF rendering library
-- **Lucide React**: Beautiful, customizable icons
-- **PostCSS**: CSS processing for Tailwind
+### 🎯 **Frontend (React)**
+- **Modern UI/UX**: Beautiful, responsive interface with Tailwind CSS
+- **Real-time Chat**: Interactive chat interface with typing indicators
+- **Drag & Drop Upload**: Intuitive document upload with progress tracking
+- **Smart Citations**: Interactive citations with hover tooltips and navigation
+- **PDF Integration**: Embedded PDF viewer with chunk highlighting
+- **State Management**: Centralized state with React Context
+- **Error Handling**: Comprehensive error boundaries and user feedback
 
-## Features Comparison
+### ⚡ **Backend (FastAPI)**
+- **RESTful API**: Clean, documented API endpoints
+- **Async Processing**: Non-blocking document processing
+- **Auto Documentation**: Interactive API docs at `/docs`
+- **CORS Support**: Configured for frontend integration
+- **File Management**: Efficient PDF storage and retrieval
+- **Citation Enhancement**: Advanced citation processing and navigation
 
-| Feature | Streamlit Version | React Version |
-|---------|------------------|---------------|
-| PDF Rendering | HTML embedding | PDF.js canvas |
-| UI Framework | Streamlit components | React + Tailwind |
-| Styling | Custom CSS + Streamlit | Tailwind CSS |
-| Navigation | URL parameters | React Router |
-| Interactivity | Server-side | Client-side |
-| Performance | Server dependent | Client optimized |
-| Customization | Limited | Highly customizable |
+### 🧠 **RAG Pipeline**
+- **Advanced Chunking**: Paragraph-aware document processing
+- **Vector Search**: ChromaDB integration for semantic search
+- **Citation Tracking**: Source attribution with page references
+- **LLM Integration**: Ollama support for local inference
+- **Smart Renumbering**: Dynamic citation reorganization
 
-## Advanced Highlighting System
+## 🚀 **QUICK START**
 
-The React version implements an improved text highlighting algorithm:
+### **Option 1: Full Stack (Recommended)**
+```bash
+# Start both backend and frontend
+./start_full_app.sh
+```
 
+### **Option 2: Individual Services**
+```bash
+# Terminal 1: Start Backend
+./start_backend.sh
+
+# Terminal 2: Start Frontend  
+./start_frontend.sh
+```
+
+### **Access Points**
+- 🌐 **Frontend App**: http://localhost:3000
+- 📖 **Backend API**: http://localhost:8000
+- 📚 **API Documentation**: http://localhost:8000/docs
+
+## 📋 **PREREQUISITES**
+
+### **System Requirements**
+- **Python**: 3.8+ (for backend)
+- **Node.js**: 16+ (for frontend)
+- **npm**: 8+ (for package management)
+
+### **External Services**
+- **Ollama**: Local LLM inference
+```bash
+# Install Ollama from https://ollama.com/
+ollama pull llama3.2:latest
+ollama serve
+```
+
+## 📦 **INSTALLATION**
+
+### **1. Backend Setup**
+```bash
+# Create virtual environment
+python -m venv rag_env
+source rag_env/bin/activate  # Windows: rag_env\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### **2. Frontend Setup**
+```bash
+# Install Node.js dependencies
+npm install
+```
+
+### **3. Environment Configuration**
+Create environment variables:
+```bash
+# For React (can be set in scripts)
+export REACT_APP_API_URL=http://localhost:8000
+```
+
+## 🏗️ **PROJECT STRUCTURE**
+
+```
+📁 Docs_RAG/
+├── 🐍 Backend (Python/FastAPI)
+│   ├── main.py                     # FastAPI application
+│   ├── processing.py               # Document processing
+│   ├── query_data.py              # RAG pipeline
+│   ├── citation_manager.py        # Citation management
+│   ├── document_service.py        # Document utilities
+│   └── requirements.txt           # Python dependencies
+│
+├── ⚛️ Frontend (React)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── chat/              # Chat interface
+│   │   │   │   ├── ChatInterface.js
+│   │   │   │   ├── MessageBubble.js
+│   │   │   │   └── CitationTooltip.js
+│   │   │   ├── ui/                # Reusable UI components
+│   │   │   │   ├── Button.js
+│   │   │   │   ├── LoadingSpinner.js
+│   │   │   │   └── DocumentUploader.js
+│   │   │   └── MainInterface.js   # Main application layout
+│   │   ├── contexts/
+│   │   │   └── AppContext.js      # Global state management
+│   │   ├── services/
+│   │   │   └── api.js             # API communication
+│   │   └── App.js                 # Root component
+│   ├── public/
+│   └── package.json               # Node.js dependencies
+│
+├── 🚀 Scripts
+│   ├── start_backend.sh           # Backend startup
+│   ├── start_frontend.sh          # Frontend startup
+│   └── start_full_app.sh          # Full stack startup
+│
+└── 📊 Data
+    ├── data/                      # PDF document storage
+    └── chroma/                    # Vector database
+```
+
+## 🔧 **COMPONENT ARCHITECTURE**
+
+### **React Components**
+
+#### **Core Layout**
+- `MainInterface`: Main application shell with sidebar and tabs
+- `ChatInterface`: Real-time chat with RAG pipeline
+- `DocumentUploader`: Drag & drop file upload with progress
+
+#### **UI Components**
+- `Button`: Configurable button with variants and loading states
+- `LoadingSpinner`: Reusable loading indicators
+- `MessageBubble`: Chat messages with citation integration
+
+#### **Citation System**
+- `CitationTooltip`: Interactive citation previews
+- Smart parsing of `[Source X]` patterns
+- Click-to-navigate functionality
+
+### **API Endpoints**
+
+#### **Document Management**
+```http
+POST   /documents/upload     # Upload and process PDFs
+GET    /documents           # List all documents
+GET    /documents/{id}/info # Get document details
+DELETE /documents/clear     # Clear all documents
+```
+
+#### **RAG Operations**
+```http
+POST   /query               # Perform RAG query
+GET    /citations/{id}/navigate # Get citation navigation
+```
+
+#### **Utilities**
+```http
+GET    /health              # Health check
+GET    /documents/{id}/base64 # Get PDF as base64
+```
+
+## 🎨 **UI/UX FEATURES**
+
+### **Modern Design**
+- **Tailwind CSS**: Utility-first styling
+- **Framer Motion**: Smooth animations and transitions
+- **Responsive Layout**: Mobile-friendly design
+- **Collapsible Sidebar**: Space-efficient navigation
+
+### **User Experience**
+- **Real-time Feedback**: Loading states and progress indicators
+- **Toast Notifications**: Success/error messages
+- **Keyboard Shortcuts**: Cmd/Ctrl+Enter to send messages
+- **Auto-scroll**: Chat automatically scrolls to new messages
+
+### **Accessibility**
+- **Semantic HTML**: Proper ARIA labels and roles
+- **Focus Management**: Keyboard navigation support
+- **Screen Reader**: Compatible with assistive technologies
+
+## 📚 **USAGE GUIDE**
+
+### **1. Document Upload**
+1. Navigate to the "Upload" tab
+2. Drag & drop PDF files or click to browse
+3. Monitor upload progress
+4. Files are automatically processed and vectorized
+
+### **2. Querying Documents**
+1. Switch to "Chat" tab
+2. Type your question in the input field
+3. Press Enter or click Send
+4. View results with interactive citations
+
+### **3. Citation Navigation**
+1. Click on `[Source X]` tags in responses
+2. View citation details in tooltips
+3. Navigate to specific document pages
+4. Explore source content in PDF viewer
+
+### **4. Document Management**
+1. Use "Documents" tab to view uploaded files
+2. Click "View" to open PDF viewer
+3. Clear individual or all documents
+4. Monitor document status and metadata
+
+## 🔧 **CONFIGURATION**
+
+### **Backend Configuration**
+```python
+# main.py - CORS settings
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+### **Frontend Configuration**
 ```javascript
-// Extract boundary words
-const firstWords = words.slice(0, 5).join(' ').toLowerCase();
-const lastWords = words.slice(-5).join(' ').toLowerCase();
-
-// Build continuous text mapping
-const continuousText = spans.map(span => span.textContent).join(' ');
-
-// Find text boundaries with fallback matching
-let startPos = continuousText.indexOf(firstWords);
-let endPos = continuousText.lastIndexOf(lastWords);
-
-// Highlight all spans within boundaries
-spanTextMap.forEach(spanInfo => {
-  if (spanInfo.endIndex > startPos && spanInfo.startIndex < endPos) {
-    highlightSpan(spanInfo.span);
-  }
-});
+// src/services/api.js - API base URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 ```
 
-## Customization
+### **Processing Parameters**
+```python
+# processing.py - Chunking configuration
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800,           # Adjust for your documents
+    chunk_overlap=80,         # Maintain context overlap
+    separators=["\n\n", "\n"] # Paragraph-aware splitting
+)
+```
 
-### Styling
-- Modify `tailwind.config.js` to change color schemes
-- Update `src/index.css` for custom animations and effects
-- Adjust component styles in individual React components
+## 🚀 **DEPLOYMENT**
 
-### Functionality
-- Add new chat features in `MainInterface.js`
-- Enhance PDF rendering in `PDFViewer.js`
-- Implement additional highlighting algorithms
+### **Development**
+```bash
+# Full development stack
+./start_full_app.sh
+```
 
-## Development
+### **Production**
+```bash
+# Backend (production)
+uvicorn main:app --host 0.0.0.0 --port 8000
 
-### Available Scripts
-- `npm start`: Start development server
-- `npm build`: Build for production
-- `npm test`: Run tests
-- `npm eject`: Eject from Create React App (not recommended)
+# Frontend (build)
+npm run build
+npx serve -s build -l 3000
+```
 
-### Adding Features
-1. Create new components in `src/components/`
-2. Add routes in `App.js` if needed
-3. Update styling with Tailwind classes
-4. Test functionality across different browsers
+## 🔍 **TROUBLESHOOTING**
 
-## Production Deployment
+### **Common Issues**
 
-1. **Build the application:**
-   ```bash
-   npm run build
-   ```
+#### **Backend Connection**
+```bash
+# Check if FastAPI is running
+curl http://localhost:8000/health
 
-2. **Deploy the `build` folder** to your preferred hosting service:
-   - Netlify
-   - Vercel
-   - AWS S3 + CloudFront
-   - GitHub Pages
+# Restart backend
+./start_backend.sh
+```
 
-## Browser Compatibility
+#### **Frontend Issues**
+```bash
+# Clear node modules and reinstall
+rm -rf node_modules package-lock.json
+npm install
 
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
+# Restart development server
+npm start
+```
 
-## Contributing
+#### **Ollama Problems**
+```bash
+# Ensure Ollama is running
+ollama serve
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+# Pull/update model
+ollama pull llama3.2:latest
+```
 
-## License
+### **Performance Optimization**
 
-This project is licensed under the MIT License.
+#### **Backend**
+- Adjust chunk sizes for your document types
+- Optimize embedding model selection
+- Configure ChromaDB persistence settings
 
-## Support
+#### **Frontend**
+- Enable React production build
+- Implement code splitting for large components
+- Optimize image and asset loading
 
-For questions or issues, please create an issue in the repository or contact the development team. 
+## 🌟 **ADVANCED FEATURES**
+
+### **Citation Enhancement**
+- **Source Tracking**: Full document lineage
+- **Page References**: Exact page and paragraph locations
+- **Relevance Scoring**: ML-based relevance metrics
+- **Content Previews**: Rich tooltip content
+
+### **PDF Integration**
+- **Text Layer Highlighting**: Precise text selection
+- **Chunk Navigation**: Jump to specific content sections
+- **Cross-platform Support**: Works on all modern browsers
+- **Fallback Strategies**: Multiple highlighting approaches
+
+### **State Management**
+- **Centralized Store**: React Context with useReducer
+- **Optimistic Updates**: Immediate UI feedback
+- **Error Recovery**: Graceful error handling
+- **Connection Monitoring**: Real-time backend status
+
+## 🧪 **TESTING**
+
+### **Backend Testing**
+```bash
+# Test API health
+curl http://localhost:8000/health
+
+# Test document upload
+curl -X POST -F "files=@document.pdf" http://localhost:8000/documents/upload
+
+# Test query
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"query": "test question"}' \
+  http://localhost:8000/query
+```
+
+### **Frontend Testing**
+```bash
+# Run React tests
+npm test
+
+# Manual testing
+# 1. Upload documents via UI
+# 2. Send queries in chat
+# 3. Test citation navigation
+```
+
+## 📖 **API DOCUMENTATION**
+
+Visit `http://localhost:8000/docs` for interactive API documentation with:
+- **Request/Response Schemas**
+- **Try It Out** functionality
+- **Model Definitions**
+- **Error Codes** reference
+
+## 🤝 **CONTRIBUTING**
+
+1. **Fork** the repository
+2. **Create** a feature branch
+3. **Implement** your changes
+4. **Test** thoroughly
+5. **Submit** a pull request
+
+### **Development Guidelines**
+- Follow React hooks patterns
+- Use TypeScript for new components (future enhancement)
+- Maintain FastAPI async patterns
+- Add comprehensive error handling
+
+## 📄 **LICENSE**
+
+MIT License - see LICENSE file for details.
+
+## 🙏 **ACKNOWLEDGMENTS**
+
+- **React Team**: For the amazing frontend framework
+- **FastAPI**: For the modern Python web framework
+- **ChromaDB**: For vector database capabilities
+- **Tailwind CSS**: For utility-first styling
+- **Framer Motion**: For smooth animations
+- **Ollama**: For local LLM integration
+- **Langchain**: For document processing utilities
+
+---
+
+🚀 **Ready to explore intelligent document analysis with modern web technologies!**
+
+## 🎯 **TRANSFORMATION SUMMARY**
+
+This project successfully transforms a Streamlit-based RAG pipeline into a modern, scalable React + FastAPI architecture:
+
+### **Before (Streamlit)**
+- ❌ Server-side rendering
+- ❌ Limited customization
+- ❌ Monolithic architecture
+- ❌ Basic UI components
+
+### **After (React + FastAPI)**
+- ✅ Client-side React application
+- ✅ Fully customizable UI/UX
+- ✅ Microservices architecture
+- ✅ Modern component system
+- ✅ Real-time interactions
+- ✅ Professional deployment ready
+
+The new architecture maintains all original RAG functionality while providing a superior user experience and development workflow. 

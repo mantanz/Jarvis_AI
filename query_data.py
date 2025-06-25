@@ -1,7 +1,7 @@
 
 import argparse
 import re
-from langchain.vectorstores.chroma import Chroma
+from langchain_community.vectorstores.chroma import Chroma
 from langchain.prompts import ChatPromptTemplate
 from langchain_community.llms.ollama import Ollama
 
@@ -87,7 +87,19 @@ def main():
 def query_rag(query_text: str):
     # Prepare the DB.
     embedding_function = get_embedding_function()
-    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+    try:
+        db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+    except Exception as e:
+        # If there's a tenant issue, try recreating the database
+        import os
+        import shutil
+        if "tenant" in str(e).lower():
+            if os.path.exists(CHROMA_PATH):
+                shutil.rmtree(CHROMA_PATH)
+            # Try creating a fresh database
+            db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+        else:
+            raise e
     k_chunks = 5
 
     # Search the DB.

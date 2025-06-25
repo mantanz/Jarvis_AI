@@ -1,4 +1,4 @@
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 def get_embedding_function():
     # Return sentence-transformers/all-MiniLM-L6-v2 embeddings

@@ -8,4 +8,14 @@ torch>=1.9.0
 transformers>=4.21.0
 # Document navigation dependencies
 pathlib2>=2.3.0
-urllib3>=1.26.0 
+urllib3>=1.26.0
+# FastAPI dependencies for React backend
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+langchain==0.2.16
+langchain-community==0.2.16
+pypdf==4.3.1
+python-dotenv==1.0.1
+pydantic==2.9.2
+PyPDF2==3.0.1 
