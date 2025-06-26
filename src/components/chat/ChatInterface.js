@@ -19,6 +19,7 @@ const ChatInterface = ({ className }) => {
     messages,
     isQuerying,
     documents,
+    selectedDocuments,
     isConnected,
     connectionError
   } = state;
@@ -254,6 +255,45 @@ const ChatInterface = ({ className }) => {
 
       {/* Input Area */}
       <div className="border-t bg-gray-50 p-4">
+        {/* Selected Documents Indicator */}
+        {documents.length > 0 && (
+          <div className="mb-3 p-2 bg-white rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-3 h-3 text-gray-500" />
+                <span className="text-gray-600">
+                  {selectedDocuments.length > 0 ? (
+                    <>
+                      <span className="font-medium text-green-600">{selectedDocuments.length}</span> of {documents.length} documents selected for queries
+                    </>
+                  ) : (
+                    <span className="text-red-600">No documents selected - select documents to enable queries</span>
+                  )}
+                </span>
+              </div>
+              {selectedDocuments.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => actions.setActiveTab?.('documents')}
+                  className="text-blue-600 hover:text-blue-800 underline"
+                >
+                  Manage
+                </button>
+              )}
+            </div>
+            {selectedDocuments.length > 0 && selectedDocuments.length <= 3 && (
+              <div className="mt-1 text-xs text-gray-500">
+                Using: {selectedDocuments.join(', ')}
+              </div>
+            )}
+            {selectedDocuments.length > 3 && (
+              <div className="mt-1 text-xs text-gray-500">
+                Using: {selectedDocuments.slice(0, 2).join(', ')} and {selectedDocuments.length - 2} more...
+              </div>
+            )}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="flex space-x-3">
           <div className="flex-1 relative">
             <textarea
@@ -262,9 +302,11 @@ const ChatInterface = ({ className }) => {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={
-                documents.length > 0 
-                  ? "Ask anything about your documents..." 
-                  : "Upload documents first, then ask questions..."
+                selectedDocuments.length > 0 
+                  ? `Ask anything about your ${selectedDocuments.length} selected document${selectedDocuments.length !== 1 ? 's' : ''}...` 
+                  : documents.length > 0
+                    ? "Select documents first, then ask questions..."
+                    : "Upload documents first, then ask questions..."
               }
               className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
               rows="1"
@@ -278,15 +320,15 @@ const ChatInterface = ({ className }) => {
             
             {/* Character count or document count */}
             <div className="absolute bottom-2 right-2 text-xs text-gray-400">
-              {documents.length > 0 && (
-                <span>{documents.length} doc{documents.length !== 1 ? 's' : ''}</span>
+              {selectedDocuments.length > 0 && (
+                <span>{selectedDocuments.length}/{documents.length} selected</span>
               )}
             </div>
           </div>
 
           <Button
             type="submit"
-            disabled={!inputValue.trim() || isQuerying || documents.length === 0}
+            disabled={!inputValue.trim() || isQuerying || selectedDocuments.length === 0}
             loading={isQuerying}
             icon={Send}
             className="px-6"

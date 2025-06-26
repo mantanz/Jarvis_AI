@@ -84,7 +84,7 @@ def main():
     else:
         print(result["formatted_response"])
 
-def query_rag(query_text: str):
+def query_rag(query_text: str, selected_documents: list = None):
     # Prepare the DB.
     embedding_function = get_embedding_function()
     try:
@@ -104,6 +104,20 @@ def query_rag(query_text: str):
 
     # Search the DB.
     results = db.similarity_search_with_score(query_text, k=k_chunks)
+    
+    # Filter results by selected documents if specified
+    if selected_documents:
+        filtered_results = []
+        for doc, score in results:
+            # Extract filename from document metadata
+            doc_source = doc.metadata.get('source', '')
+            # Get just the filename from the path
+            filename = doc_source.split('/')[-1] if doc_source else ''
+            
+            if filename in selected_documents:
+                filtered_results.append((doc, score))
+        
+        results = filtered_results
 
     # --- REFACTORED SECTION START ---
     

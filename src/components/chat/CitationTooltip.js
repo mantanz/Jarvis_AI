@@ -14,10 +14,26 @@ const CitationTooltip = ({
 
   const handleMouseEnter = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    setPosition({
-      x: rect.left + rect.width / 2,
-      y: rect.top - 8
-    });
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate optimal position
+    let x = rect.left + rect.width / 2;
+    let y = rect.top - 8;
+    
+    // Adjust horizontal position if tooltip would go off-screen
+    if (x + 400 > viewportWidth) { // 400px is approximate tooltip width
+      x = viewportWidth - 420; // Leave some margin
+    } else if (x - 400 < 0) {
+      x = 20; // Minimum left margin
+    }
+    
+    // Adjust vertical position if tooltip would go off-screen
+    if (y - 200 < 0) { // If not enough space above
+      y = rect.bottom + 8; // Show below instead
+    }
+    
+    setPosition({ x, y });
     setIsVisible(true);
   };
 
@@ -26,9 +42,8 @@ const CitationTooltip = ({
   };
 
   const tooltipContent = citation?.tooltip_text || citation?.content || `Source ${sourceNum}`;
-  const truncatedContent = tooltipContent.length > 200 
-    ? tooltipContent.slice(0, 200) + '...' 
-    : tooltipContent;
+  // Show the full chunk content without truncation
+  const fullContent = tooltipContent;
 
   return (
     <>
@@ -63,7 +78,7 @@ const CitationTooltip = ({
                 transform: 'translate(-50%, -100%)'
               }}
             >
-              <div className="bg-gray-900 text-white text-sm rounded-lg shadow-lg p-3 max-w-sm">
+              <div className="bg-gray-900 text-white text-sm rounded-lg shadow-xl border border-gray-700 p-4 max-w-2xl max-h-96 overflow-y-auto backdrop-blur-sm scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                 {/* Arrow */}
                 <div className="absolute top-full left-1/2 transform -translate-x-1/2">
                   <div className="border-4 border-transparent border-t-gray-900"></div>
@@ -71,30 +86,25 @@ const CitationTooltip = ({
                 
                 {/* Header */}
                 {citation && (
-                  <div className="border-b border-gray-700 pb-2 mb-2">
+                  <div className="border-b border-gray-700 pb-2 mb-3">
                     <div className="font-medium text-blue-300">
                       Source {sourceNum}
                     </div>
                     <div className="text-xs text-gray-300">
                       {citation.filename} • Page {citation.page}
                     </div>
-                    {citation.relevance_score && (
-                      <div className="text-xs text-gray-400">
-                        Relevance: {(citation.relevance_score * 100).toFixed(1)}%
-                      </div>
-                    )}
                   </div>
                 )}
                 
                 {/* Content */}
-                <div className="text-gray-100 leading-relaxed">
-                  {truncatedContent}
+                <div className="text-gray-100 leading-relaxed whitespace-pre-wrap text-sm">
+                  {fullContent}
                 </div>
                 
                 {/* Footer */}
-                <div className="mt-2 pt-2 border-t border-gray-700">
+                <div className="mt-3 pt-2 border-t border-gray-700">
                   <div className="text-xs text-gray-400">
-                    Click to view in document
+                    Click to view full document
                   </div>
                 </div>
               </div>

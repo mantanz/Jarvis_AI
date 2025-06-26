@@ -152,12 +152,13 @@ const MessageBubble = ({
                       >
                         <button
                           className={clsx(
-                            'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border mx-0.5 transition-colors',
+                            'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border mx-0.5 transition-all duration-200 cursor-pointer',
                             isUser
-                              ? 'bg-blue-500 text-white border-blue-400 hover:bg-blue-400'
-                              : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                              ? 'bg-blue-500 text-white border-blue-400 hover:bg-blue-400 hover:shadow-sm'
+                              : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 hover:shadow-sm'
                           )}
                           onClick={() => handleCitationClick(part.sourceNum)}
+                          title="Hover to see source content, click to view full document"
                         >
                           Source {part.sourceNum}
                         </button>
@@ -226,8 +227,8 @@ const MessageBubble = ({
                           {citation.filename} • Page {citation.page}
                         </div>
                         {citation.tooltip_text && (
-                          <div className="text-gray-500 mt-1 line-clamp-2">
-                            {citation.tooltip_text.slice(0, 100)}...
+                          <div className="text-gray-500 mt-1 line-clamp-3">
+                            {citation.tooltip_text.slice(0, 150)}...
                           </div>
                         )}
                       </div>

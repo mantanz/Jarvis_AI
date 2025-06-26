@@ -19,6 +19,7 @@ import {
 import { useApp } from '../contexts/AppContext';
 import ChatInterface from './chat/ChatInterface';
 import DocumentUploader from './ui/DocumentUploader';
+import DocumentSelector from './ui/DocumentSelector';
 import Button from './ui/Button';
 import LoadingSpinner from './ui/LoadingSpinner';
 import clsx from 'clsx';
@@ -31,6 +32,7 @@ const MainInterface = () => {
 
   const {
     documents,
+    selectedDocuments,
     documentsLoading,
     isUploading,
     uploadProgress,
@@ -149,17 +151,50 @@ const MainInterface = () => {
             {/* Documents Summary */}
             {documents.length > 0 && (
               <div className="p-4 border-t border-gray-200">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className={clsx(
+                  'border rounded-lg p-3',
+                  selectedDocuments.length > 0 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-yellow-50 border-yellow-200'
+                )}>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-green-800">
-                      Ready for Analysis
+                    <h3 className={clsx(
+                      'text-sm font-medium',
+                      selectedDocuments.length > 0 ? 'text-green-800' : 'text-yellow-800'
+                    )}>
+                      {selectedDocuments.length > 0 ? 'Ready for Analysis' : 'Selection Required'}
                     </h3>
-                    <FileText className="w-4 h-4 text-green-600" />
+                    <FileText className={clsx(
+                      'w-4 h-4',
+                      selectedDocuments.length > 0 ? 'text-green-600' : 'text-yellow-600'
+                    )} />
                   </div>
-                  <p className="text-xs text-green-700">
-                    {documents.length} document{documents.length !== 1 ? 's' : ''} loaded
+                  <p className={clsx(
+                    'text-xs',
+                    selectedDocuments.length > 0 ? 'text-green-700' : 'text-yellow-700'
+                  )}>
+                    {selectedDocuments.length > 0 ? (
+                      <>
+                        {selectedDocuments.length} of {documents.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected
+                      </>
+                    ) : (
+                      <>
+                        {documents.length} document{documents.length !== 1 ? 's' : ''} loaded, none selected
+                      </>
+                    )}
                   </p>
-                  <div className="mt-2">
+                  <div className="mt-2 flex space-x-2">
+                    {selectedDocuments.length === 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setActiveTab('documents')}
+                        className="text-yellow-700 hover:text-yellow-800 hover:bg-yellow-100 text-xs"
+                      >
+                        <FileText className="w-3 h-3 mr-1" />
+                        Select Documents
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -245,7 +280,7 @@ const MainInterface = () => {
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Document Library</h2>
                   <p className="text-gray-600">
-                    Manage your uploaded documents and view their details.
+                    Select documents to include in your RAG queries. Only selected documents will be used for analysis.
                   </p>
                 </div>
                 <Button
@@ -277,41 +312,61 @@ const MainInterface = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="grid gap-4">
-                  {documents.map((doc) => (
-                    <div
-                      key={doc.filename}
-                      className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-3 flex-1">
-                          <FileText className="w-8 h-8 text-blue-600 mt-1" />
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg font-medium text-gray-900 truncate">
-                              {doc.filename}
-                            </h3>
-                            <p className="text-sm text-gray-500">
-                              {formatFileSize(doc.size)}
-                            </p>
-                            <div className="mt-2 flex items-center space-x-4 text-xs text-gray-500">
-                              <span>PDF Document</span>
-                              <span>•</span>
-                              <span>Ready for analysis</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate(`/pdf-viewer?file=${doc.filename}`)}
-                          >
-                            View
-                          </Button>
-                        </div>
+                <div className="space-y-6">
+                  {/* Document Selection Info */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-blue-900">Document Selection</h3>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Select which documents you want to include in your RAG queries. Only selected documents will be analyzed when you ask questions.
+                        </p>
                       </div>
                     </div>
-                  ))}
+                  </div>
+
+                  {/* Document Selector */}
+                  <DocumentSelector
+                    documents={documents}
+                    selectedDocuments={selectedDocuments}
+                    onToggleDocument={actions.toggleDocumentSelection}
+                    onSelectAll={actions.selectAllDocuments}
+                    onDeselectAll={actions.deselectAllDocuments}
+                  />
+
+                  {/* Quick Actions */}
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                    <div className="text-sm text-gray-600">
+                      {selectedDocuments.length > 0 ? (
+                        <>
+                          <span className="font-medium text-green-600">{selectedDocuments.length}</span> of {documents.length} documents selected for analysis
+                        </>
+                      ) : (
+                        <span className="text-red-600">No documents selected - queries will not work</span>
+                      )}
+                    </div>
+                    <div className="flex space-x-3">
+                      {selectedDocuments.length > 0 && (
+                        <Button
+                          onClick={() => setActiveTab('chat')}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          Start Chatting ({selectedDocuments.length} docs)
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={handleClearDocuments}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Clear All Documents
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

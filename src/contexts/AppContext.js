@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 const initialState = {
   // Documents
   documents: [],
+  selectedDocuments: [], // Array of selected document filenames
   documentsLoading: false,
   documentsError: null,
   
@@ -50,6 +51,10 @@ const ActionTypes = {
   SET_DOCUMENTS_ERROR: 'SET_DOCUMENTS_ERROR',
   ADD_DOCUMENT: 'ADD_DOCUMENT',
   REMOVE_DOCUMENT: 'REMOVE_DOCUMENT',
+  SET_SELECTED_DOCUMENTS: 'SET_SELECTED_DOCUMENTS',
+  TOGGLE_DOCUMENT_SELECTION: 'TOGGLE_DOCUMENT_SELECTION',
+  SELECT_ALL_DOCUMENTS: 'SELECT_ALL_DOCUMENTS',
+  DESELECT_ALL_DOCUMENTS: 'DESELECT_ALL_DOCUMENTS',
   
   // Messages
   ADD_MESSAGE: 'ADD_MESSAGE',
@@ -97,8 +102,31 @@ function appReducer(state, action) {
     case ActionTypes.REMOVE_DOCUMENT:
       return { 
         ...state, 
-        documents: state.documents.filter(doc => doc.filename !== action.payload) 
+        documents: state.documents.filter(doc => doc.filename !== action.payload),
+        selectedDocuments: state.selectedDocuments.filter(filename => filename !== action.payload)
       };
+    
+    case ActionTypes.SET_SELECTED_DOCUMENTS:
+      return { ...state, selectedDocuments: action.payload };
+    
+    case ActionTypes.TOGGLE_DOCUMENT_SELECTION:
+      const filename = action.payload;
+      const isSelected = state.selectedDocuments.includes(filename);
+      return {
+        ...state,
+        selectedDocuments: isSelected
+          ? state.selectedDocuments.filter(f => f !== filename)
+          : [...state.selectedDocuments, filename]
+      };
+    
+    case ActionTypes.SELECT_ALL_DOCUMENTS:
+      return {
+        ...state,
+        selectedDocuments: state.documents.map(doc => doc.filename)
+      };
+    
+    case ActionTypes.DESELECT_ALL_DOCUMENTS:
+      return { ...state, selectedDocuments: [] };
     
     case ActionTypes.ADD_MESSAGE:
       return { ...state, messages: [...state.messages, action.payload] };
@@ -170,6 +198,10 @@ export const AppProvider = ({ children }) => {
       try {
         const documents = await apiService.getDocuments();
         dispatch({ type: ActionTypes.SET_DOCUMENTS, payload: documents });
+        
+        // Auto-select all documents by default
+        const documentFilenames = documents.map(doc => doc.filename);
+        dispatch({ type: ActionTypes.SET_SELECTED_DOCUMENTS, payload: documentFilenames });
       } catch (error) {
         dispatch({ type: ActionTypes.SET_DOCUMENTS_ERROR, payload: error.message });
         toast.error('Failed to load documents');
@@ -204,12 +236,30 @@ export const AppProvider = ({ children }) => {
       try {
         await apiService.clearDocuments();
         dispatch({ type: ActionTypes.SET_DOCUMENTS, payload: [] });
+        dispatch({ type: ActionTypes.SET_SELECTED_DOCUMENTS, payload: [] });
         dispatch({ type: ActionTypes.CLEAR_MESSAGES });
         toast.success('All documents cleared');
       } catch (error) {
         toast.error('Failed to clear documents');
         throw error;
       }
+    },
+
+    // Document selection actions
+    toggleDocumentSelection(filename) {
+      dispatch({ type: ActionTypes.TOGGLE_DOCUMENT_SELECTION, payload: filename });
+    },
+
+    selectAllDocuments() {
+      dispatch({ type: ActionTypes.SELECT_ALL_DOCUMENTS });
+    },
+
+    deselectAllDocuments() {
+      dispatch({ type: ActionTypes.DESELECT_ALL_DOCUMENTS });
+    },
+
+    setSelectedDocuments(filenames) {
+      dispatch({ type: ActionTypes.SET_SELECTED_DOCUMENTS, payload: filenames });
     },
 
     // Message actions
@@ -231,6 +281,12 @@ export const AppProvider = ({ children }) => {
     async queryDocuments(query) {
       if (!query.trim()) return;
 
+      // Check if any documents are selected
+      if (state.selectedDocuments.length === 0) {
+        toast.error('Please select at least one document to query');
+        return;
+      }
+
       dispatch({ type: ActionTypes.SET_CURRENT_QUERY, payload: query });
       dispatch({ type: ActionTypes.SET_IS_QUERYING, payload: true });
       
@@ -243,12 +299,12 @@ export const AppProvider = ({ children }) => {
       // Add loading bot message
       const loadingMessage = actions.addMessage({
         type: 'bot',
-        content: 'Analyzing your documents...',
+        content: 'Analyzing your selected documents...',
         isLoading: true,
       });
 
       try {
-        const result = await apiService.queryDocuments(query);
+        const result = await apiService.queryDocuments(query, state.selectedDocuments);
         
         // Update loading message with actual response
         actions.updateMessage(loadingMessage.id, {

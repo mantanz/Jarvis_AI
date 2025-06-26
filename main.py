@@ -37,6 +37,7 @@ document_service = DocumentService()
 # Pydantic models
 class QueryRequest(BaseModel):
     query: str
+    selected_documents: List[str] = []
     include_html: bool = True
 
 class QueryResponse(BaseModel):
@@ -112,7 +113,7 @@ async def list_documents():
 async def query_documents(request: QueryRequest):
     """Query documents using RAG pipeline."""
     try:
-        result = query_rag(request.query)
+        result = query_rag(request.query, request.selected_documents)
         
         # Enhance citations with navigation data
         enhanced_citations = result["citations"]  # For now, just use basic citations

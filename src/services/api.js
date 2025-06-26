@@ -80,9 +80,10 @@ class APIService {
   }
 
   // RAG Operations
-  async queryDocuments(query, includeHtml = true) {
+  async queryDocuments(query, selectedDocuments = [], includeHtml = true) {
     const response = await api.post('/query', {
       query,
+      selected_documents: selectedDocuments,
       include_html: includeHtml,
     });
     return response.data;
