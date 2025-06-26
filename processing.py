@@ -1,4 +1,3 @@
-
 import argparse
 import os
 import shutil
@@ -8,6 +7,8 @@ from langchain.schema.document import Document
 from get_embedding_function import get_embedding_function
 from langchain_community.vectorstores import Chroma
 
+# Import robust table extraction library
+import camelot
 
 CHROMA_PATH = "chroma"
 DATA_PATH = "data"
@@ -29,9 +30,114 @@ def main():
     add_to_chroma(chunks)
 
 
+def extract_all_tables_with_camelot(pdf_path: str) -> list:
+    """
+    Extract ALL tables from a PDF using Camelot's automatic table detection.
+    This is a general-purpose solution that works with any PDF format.
+    """
+    extracted_tables = []
+    
+    try:
+        # Use Camelot to extract tables with both lattice and stream methods
+        # Lattice method: for tables with clear borders
+        try:
+            lattice_tables = camelot.read_pdf(pdf_path, pages='all', flavor='lattice')
+            for i, table in enumerate(lattice_tables):
+                if not table.df.empty:
+                    table_text = f"\n--- CAMELOT TABLE {i+1} (Lattice Method) ---\n"
+                    table_text += table.df.to_string(index=False, na_rep='')
+                    table_text += f"\n--- END TABLE {i+1} ---\n"
+                    extracted_tables.append({
+                        'content': table_text,
+                        'method': 'lattice',
+                        'page': table.page,
+                        'accuracy': getattr(table, 'accuracy', 0)
+                    })
+        except Exception as e:
+            print(f"Lattice method failed for {pdf_path}: {e}")
+        
+        # Stream method: for tables without clear borders
+        try:
+            stream_tables = camelot.read_pdf(pdf_path, pages='all', flavor='stream')
+            for i, table in enumerate(stream_tables):
+                if not table.df.empty:
+                    table_text = f"\n--- CAMELOT TABLE {i+1} (Stream Method) ---\n"
+                    table_text += table.df.to_string(index=False, na_rep='')
+                    table_text += f"\n--- END TABLE {i+1} ---\n"
+                    extracted_tables.append({
+                        'content': table_text,
+                        'method': 'stream',
+                        'page': table.page,
+                        'accuracy': getattr(table, 'accuracy', 0)
+                    })
+        except Exception as e:
+            print(f"Stream method failed for {pdf_path}: {e}")
+            
+    except Exception as e:
+        print(f"Camelot table extraction failed for {pdf_path}: {e}")
+    
+    return extracted_tables
+
+
+def load_documents_with_robust_table_extraction():
+    """
+    Load documents using Camelot for robust, automatic table detection.
+    This approach works with any PDF without manual pattern matching.
+    """
+    documents = []
+    
+    for filename in os.listdir(DATA_PATH):
+        if filename.endswith('.pdf'):
+            file_path = os.path.join(DATA_PATH, filename)
+            print(f"Processing {filename} with robust table extraction...")
+            
+            # Extract regular text using standard loader
+            document_loader = PyPDFDirectoryLoader(DATA_PATH)
+            temp_docs = document_loader.load()
+            
+            # Find the document for this file
+            doc_content = ""
+            for doc in temp_docs:
+                if filename in doc.metadata.get('source', ''):
+                    doc_content = doc.page_content
+                    break
+            
+            # Extract tables using Camelot
+            extracted_tables = extract_all_tables_with_camelot(file_path)
+            
+            # Combine text and tables
+            full_content = doc_content
+            
+            if extracted_tables:
+                full_content += "\n\n=== EXTRACTED TABLES ===\n"
+                for table_info in extracted_tables:
+                    full_content += table_info['content']
+                
+                print(f"✓ Found {len(extracted_tables)} tables in {filename}")
+            else:
+                print(f"✓ No tables found in {filename}")
+            
+            # Create document with metadata
+            document = Document(
+                page_content=full_content,
+                metadata={"source": file_path}
+            )
+            documents.append(document)
+    
+    return documents
+
+
 def load_documents():
-    document_loader = PyPDFDirectoryLoader(DATA_PATH)
-    return document_loader.load()
+    """
+    Load documents using robust table extraction that works with any PDF.
+    """
+    try:
+        return load_documents_with_robust_table_extraction()
+    except Exception as e:
+        print(f"Robust table extraction failed: {e}")
+        print("Falling back to standard PDF extraction...")
+        document_loader = PyPDFDirectoryLoader(DATA_PATH)
+        return document_loader.load()
 
 
 def split_documents(documents: list[Document]):
@@ -221,6 +327,17 @@ def add_to_chroma(chunks: list[Document]):
 
     # Calculate Page IDs.
     chunks_with_ids = calculate_chunk_ids(chunks)
+
+    # Clean metadata to avoid None values
+    for chunk in chunks_with_ids:
+        cleaned_metadata = {}
+        for key, value in chunk.metadata.items():
+            if value is not None:
+                if isinstance(value, (str, int, float, bool)):
+                    cleaned_metadata[key] = value
+                else:
+                    cleaned_metadata[key] = str(value)
+        chunk.metadata = cleaned_metadata
 
     # Add or Update the documents.
     existing_items = db.get(include=[])  # IDs are always included by default

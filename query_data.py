@@ -96,6 +96,28 @@ def enhance_query_for_search(query_text: str) -> list[str]:
     # Extract key terms and create focused queries
     lower_query = query_text.lower()
     
+    # Handle hypothesis queries (H1, H2, H3, etc.)
+    hypothesis_match = re.search(r'\bh(\d+)\b', lower_query)
+    if hypothesis_match:
+        h_num = hypothesis_match.group(1)
+        queries.extend([
+            f"H{h_num} hypothesis",
+            f"hypothesis H{h_num}",
+            f"TABLE 5 H{h_num}",
+            f"H{h_num} headlines",
+            "TABLE 5 hypotheses list",
+            "hypotheses table p value performance"
+        ])
+    
+    # Handle table-related queries
+    if any(word in lower_query for word in ["table", "hypothesis", "hypotheses", "p value", "performance"]):
+        queries.extend([
+            "TABLE 5 hypotheses",
+            "hypothesis p ΔPerformance",
+            "hypotheses table headlines",
+            "TABLE 5 The list of hypotheses"
+        ])
+    
     # Handle specific acronyms and programs
     if "darpa" in lower_query and "ace" in lower_query:
         queries.extend([
@@ -114,6 +136,11 @@ def enhance_query_for_search(query_text: str) -> list[str]:
             queries.append(subject)
             queries.append(f"{subject} program")
             queries.append(f"{subject} system")
+            
+            # Special handling for hypothesis queries
+            if re.search(r'\bh\d+\b', subject):
+                queries.append(f"{subject} hypothesis")
+                queries.append("TABLE 5 hypotheses")
     
     # Handle "how does" questions
     if lower_query.startswith("how does") or lower_query.startswith("how do"):
