@@ -84,6 +84,46 @@ def main():
     else:
         print(result["formatted_response"])
 
+def enhance_query_for_search(query_text: str) -> list[str]:
+    """
+    Enhance user queries by generating multiple search variations for better semantic matching.
+    """
+    import re
+    
+    # Create multiple query variations
+    queries = [query_text]  # Always include original query
+    
+    # Extract key terms and create focused queries
+    lower_query = query_text.lower()
+    
+    # Handle specific acronyms and programs
+    if "darpa" in lower_query and "ace" in lower_query:
+        queries.extend([
+            "DARPA ACE Air Combat Evolution",
+            "DARPA ACE program",
+            "Air Combat Evolution program",
+            "DARPA Air Combat Evolution"
+        ])
+    
+    # Handle common question patterns
+    if lower_query.startswith("what is") or lower_query.startswith("what does"):
+        # Extract the main subject after "what is/does"
+        match = re.search(r"what (?:is|does) (.+?)(?:\?|$)", lower_query)
+        if match:
+            subject = match.group(1).strip()
+            queries.append(subject)
+            queries.append(f"{subject} program")
+            queries.append(f"{subject} system")
+    
+    # Handle "how does" questions
+    if lower_query.startswith("how does") or lower_query.startswith("how do"):
+        match = re.search(r"how (?:does|do) (.+?)(?:\?|$)", lower_query)
+        if match:
+            subject = match.group(1).strip()
+            queries.append(subject)
+    
+    return queries
+
 def query_rag(query_text: str, selected_documents: list = None):
     # Prepare the DB.
     embedding_function = get_embedding_function()
@@ -102,8 +142,26 @@ def query_rag(query_text: str, selected_documents: list = None):
             raise e
     k_chunks = 5
 
-    # Search the DB.
-    results = db.similarity_search_with_score(query_text, k=k_chunks)
+    # Enhanced search with multiple query variations
+    enhanced_queries = enhance_query_for_search(query_text)
+    all_results = []
+    
+    # Search with each query variation and collect results
+    for query_variant in enhanced_queries:
+        variant_results = db.similarity_search_with_score(query_variant, k=k_chunks)
+        all_results.extend(variant_results)
+    
+    # Remove duplicates and sort by score (lower is better)
+    seen_content = set()
+    unique_results = []
+    for doc, score in all_results:
+        content_hash = hash(doc.page_content)
+        if content_hash not in seen_content:
+            seen_content.add(content_hash)
+            unique_results.append((doc, score))
+    
+    # Sort by score and take top k_chunks
+    results = sorted(unique_results, key=lambda x: x[1])[:k_chunks]
     
     # Filter results by selected documents if specified
     if selected_documents:

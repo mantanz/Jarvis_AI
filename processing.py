@@ -35,49 +35,182 @@ def load_documents():
 
 
 def split_documents(documents: list[Document]):
-    # Custom paragraph-aware text splitter
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,
-        chunk_overlap=80,
-        length_function=len,
-        is_separator_regex=False,
-        # Add paragraph separators as primary split points
-        separators=["\n\n", "\n"]  # Prioritize paragraph breaks
-    )
-    
+    """
+    Custom paragraph-aware chunking that respects paragraph boundaries.
+    Chunks are filled to maximum capacity but never cross paragraph boundaries.
+    """
+    chunk_size = 800
     chunks = []
     
     for doc in documents:
-        # First, split the document into paragraphs
-        paragraphs = doc.page_content.split('\n\n')
+        # Split document into paragraphs using improved detection
+        paragraphs = detect_paragraphs(doc.page_content)
         
-        # Process each paragraph separately to maintain paragraph boundaries
+        # Process each paragraph with strict boundary respect
         for para_idx, paragraph in enumerate(paragraphs, 1):
-            if not paragraph.strip():  # Skip empty paragraphs
-                continue
-                
-            # Create a temporary document for this paragraph
-            para_doc = Document(
-                page_content=paragraph,
-                metadata={
-                    **doc.metadata,
-                    "paragraph_num": para_idx
-                }
+            paragraph_chunks = split_paragraph_into_chunks(
+                paragraph, 
+                chunk_size, 
+                doc.metadata, 
+                para_idx
             )
-            
-            # Split the paragraph into chunks if it's too long
-            para_chunks = text_splitter.split_documents([para_doc])
-            
-            # If paragraph fits in one chunk, keep it as is
-            if len(para_chunks) == 1:
-                chunks.append(para_chunks[0])
-            else:
-                # If paragraph needs to be split, add chunk numbers within the paragraph
-                for chunk_idx, chunk in enumerate(para_chunks):
-                    chunk.metadata["chunk_in_paragraph"] = chunk_idx + 1
-                    chunks.append(chunk)
+            chunks.extend(paragraph_chunks)
     
     return chunks
+
+
+def detect_paragraphs(text: str):
+    """
+    Detect paragraph boundaries in PDF-extracted text using conservative heuristics.
+    Focus on clear paragraph breaks rather than sentence breaks.
+    """
+    import re
+    
+    # Normalize the text first
+    text = text.strip()
+    
+    # Replace various paragraph separators with a consistent marker
+    # Pattern 1: Double newlines with optional whitespace (standard paragraph break)
+    text = re.sub(r'\n\s*\n+', '§PARA§', text)
+    
+    # Pattern 2: Sentence ending followed by newline and clear paragraph starters
+    paragraph_starters = [
+        r'([.!?])\s*\n\s*(An example of)',
+        r'([.!?])\s*\n\s*(For instance)',
+        r'([.!?])\s*\n\s*(However)',
+        r'([.!?])\s*\n\s*(Moreover)',
+        r'([.!?])\s*\n\s*(Furthermore)',
+        r'([.!?])\s*\n\s*(In addition)',
+        r'([.!?])\s*\n\s*(Therefore)',
+        r'([.!?])\s*\n\s*(Thus)',
+        r'([.!?])\s*\n\s*(Consequently)',
+        r'([.!?])\s*\n\s*(In conclusion)',
+        r'([.!?])\s*\n\s*([A-Z][A-Z\s]+ [A-Z])',  # ALL CAPS titles/headers
+        r'([.!?])\s*\n\s*([0-9]+\.)',  # Numbered sections
+    ]
+    
+    for pattern in paragraph_starters:
+        text = re.sub(pattern, r'\1§PARA§\2', text, flags=re.IGNORECASE)
+    
+    # Pattern 3: Sentence ending followed by newline and what looks like a new topic
+    # Be very conservative - only split if it's clearly a new paragraph
+    text = re.sub(r'([.!?])\s*\n\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+[A-Z])', r'\1§PARA§\2', text)
+    
+    # Pattern 4: Handle specific cases like titles or headers
+    text = re.sub(r'([.!?])\s*\n\s*([A-Z][-\w\s]+ Event)', r'\1§PARA§\2', text)
+    text = re.sub(r'([.!?])\s*\n\s*(Imagine)', r'\1§PARA§\2', text)
+    
+    # Pattern 5: Split titles/headers from their following content
+    text = re.sub(r'([A-Z][-\w\s]+ Event)\s*\n\s*([A-Z][a-z])', r'\1§PARA§\2', text)
+    
+    # Split on our marker and clean up
+    paragraphs = []
+    for para in text.split('§PARA§'):
+        # Clean up the paragraph
+        para = re.sub(r'\n+', ' ', para)  # Replace internal newlines with spaces
+        para = re.sub(r'\s+', ' ', para)  # Normalize whitespace
+        para = para.strip()
+        
+        if para and len(para) > 20:  # Only keep substantial paragraphs
+            paragraphs.append(para)
+    
+    return paragraphs
+
+
+def split_paragraph_into_chunks(paragraph: str, chunk_size: int, base_metadata: dict, para_idx: int):
+    """
+    Split a single paragraph into chunks without crossing paragraph boundaries.
+    Each chunk is filled to maximum capacity within the paragraph.
+    """
+    chunks = []
+    
+    # If paragraph fits in one chunk, return it as is
+    if len(paragraph) <= chunk_size:
+        chunk = Document(
+            page_content=paragraph,
+            metadata={
+                **base_metadata,
+                "paragraph_num": para_idx,
+                "chunk_in_paragraph": 1
+            }
+        )
+        chunks.append(chunk)
+        return chunks
+    
+    # Split paragraph into sentences for better chunking
+    sentences = split_into_sentences(paragraph)
+    
+    current_chunk = ""
+    chunk_in_para = 1
+    
+    for sentence in sentences:
+        # Check if adding this sentence would exceed chunk size
+        potential_chunk = current_chunk + (" " if current_chunk else "") + sentence
+        
+        if len(potential_chunk) <= chunk_size:
+            # Add sentence to current chunk
+            current_chunk = potential_chunk
+        else:
+            # Current chunk is full, save it and start a new one
+            if current_chunk:
+                chunk = Document(
+                    page_content=current_chunk.strip(),
+                    metadata={
+                        **base_metadata,
+                        "paragraph_num": para_idx,
+                        "chunk_in_paragraph": chunk_in_para
+                    }
+                )
+                chunks.append(chunk)
+                chunk_in_para += 1
+            
+            # Start new chunk with current sentence
+            current_chunk = sentence
+    
+    # Add the last chunk if it has content
+    if current_chunk:
+        chunk = Document(
+            page_content=current_chunk.strip(),
+            metadata={
+                **base_metadata,
+                "paragraph_num": para_idx,
+                "chunk_in_paragraph": chunk_in_para
+            }
+        )
+        chunks.append(chunk)
+    
+    return chunks
+
+
+def split_into_sentences(text: str):
+    """
+    Split text into sentences using simple heuristics.
+    This is a basic implementation - could be enhanced with more sophisticated NLP.
+    """
+    import re
+    
+    # Split on sentence endings, but be careful with abbreviations
+    sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+    
+    # If no sentence splits found, split on other punctuation or length
+    if len(sentences) == 1 and len(text) > 400:
+        # Fallback: split on commas, semicolons, or at word boundaries
+        parts = re.split(r'[,;]\s+|(?<=\w)\s+(?=\w)', text)
+        
+        # Group parts to form reasonable chunks
+        sentences = []
+        current = ""
+        for part in parts:
+            if len(current + " " + part) <= 200:  # Smaller sub-chunks
+                current = current + (" " if current else "") + part
+            else:
+                if current:
+                    sentences.append(current)
+                current = part
+        if current:
+            sentences.append(current)
+    
+    return [s.strip() for s in sentences if s.strip()]
 
 
 def add_to_chroma(chunks: list[Document]):

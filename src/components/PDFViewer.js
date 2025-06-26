@@ -129,7 +129,7 @@ const PDFViewer = () => {
   }, [location]);
 
   const loadPDFFromBackend = async (filename) => {
-    try {
+      try {
       setLoading(true);
       
       // Fetch PDF directly from backend API
@@ -156,7 +156,7 @@ const PDFViewer = () => {
       // Render first page
       renderPage(1);
       
-    } catch (error) {
+      } catch (error) {
       console.error('Error loading PDF from backend:', error);
       setLoading(false);
       // You could add an error state here to show user-friendly error messages

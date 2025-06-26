@@ -9,12 +9,12 @@ import './index.css';
 function App() {
   return (
     <AppProvider>
-      <Router>
+    <Router>
         <div className="App min-h-screen bg-gray-50">
-          <Routes>
-            <Route path="/" element={<MainInterface />} />
-            <Route path="/pdf-viewer" element={<PDFViewer />} />
-          </Routes>
+        <Routes>
+          <Route path="/" element={<MainInterface />} />
+          <Route path="/pdf-viewer" element={<PDFViewer />} />
+        </Routes>
           
           {/* Toast notifications */}
           <Toaster
@@ -34,8 +34,8 @@ function App() {
               },
             }}
           />
-        </div>
-      </Router>
+      </div>
+    </Router>
     </AppProvider>
   );
 }

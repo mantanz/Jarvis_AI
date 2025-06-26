@@ -20,4 +20,6 @@ pip install -r requirements.txt
 # Start the FastAPI server
 echo "🌐 Starting FastAPI server on http://localhost:8000"
 echo "📖 API Documentation will be available at http://localhost:8000/docs"
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload 
+# uvicorn main:app --host 0.0.0.0 --port 8000 --reload 
+
+source rag_env/bin/activate && uvicorn main:app --reload --port 8000
